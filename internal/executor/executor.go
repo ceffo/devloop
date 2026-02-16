@@ -25,7 +25,8 @@ import (
 //   - wave: Filter by wave number (0 = all waves)
 //   - taskID: Filter by specific task ID (empty = all tasks)
 //   - continueSession: Whether to resume from last checkpoint
-func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession bool) error {
+//   - dryRun: If true, only show what would be executed without running
+func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession bool, dryRun bool) error {
 	// Setup signal handling for graceful interrupts
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -63,21 +64,30 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		return fmt.Errorf("failed to save initial session: %w", err)
 	}
 
-	fmt.Printf("🚀 Starting dev loop execution (Session: %s)\n\n", session.ID[:8])
+	if dryRun {
+		fmt.Printf("🔍 Dry run mode - showing what would be executed (Session: %s)\n\n", session.ID[:8])
+	} else {
+		fmt.Printf("🚀 Starting dev loop execution (Session: %s)\n\n", session.ID[:8])
+	}
 
-	// Build filter for task query
+	// Build filter for task query - get all pending tasks
 	filter := storage.Filter{
-		Status:    "pending",
-		BlockedBy: []string{}, // Only unblocked tasks
+		Status: "pending",
 	}
 	if wave > 0 {
 		filter.Wave = wave
 	}
 
-	// Query executable tasks
-	tasks, err := store.QueryTasks(filter)
+	// Query all pending tasks
+	allPendingTasks, err := store.QueryTasks(filter)
 	if err != nil {
 		return fmt.Errorf("failed to query tasks: %w", err)
+	}
+
+	// Filter to only tasks whose dependencies are completed
+	tasks, err := filterReadyTasks(store, allPendingTasks)
+	if err != nil {
+		return fmt.Errorf("failed to filter ready tasks: %w", err)
 	}
 
 	// Filter specific task if requested
@@ -103,6 +113,12 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 	}
 
 	fmt.Printf("Found %d task(s) to execute\n\n", len(tasks))
+
+	// If dry-run mode, just print tasks and exit
+	if dryRun {
+		printDryRunSummary(tasks)
+		return nil
+	}
 
 	// Initialize agent runner
 	agentRunner, err := agent.NewAgentRunner(cfg.CLI.Tool)
@@ -383,4 +399,54 @@ func printSummary(successCount, failureCount int, session *Session) error {
 	}
 
 	return nil
+}
+
+// filterReadyTasks filters pending tasks to only those whose dependencies are completed
+func filterReadyTasks(store *storage.Storage, pendingTasks []*storage.Task) ([]*storage.Task, error) {
+	// Load all tasks to check dependency status
+	allTasks, err := store.LoadTasks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load all tasks: %w", err)
+	}
+
+	// Build a map of task statuses for quick lookup
+	taskStatus := make(map[string]string)
+	for _, task := range allTasks {
+		taskStatus[task.ID] = task.Status
+	}
+
+	// Filter to only tasks with all dependencies completed
+	var readyTasks []*storage.Task
+	for _, task := range pendingTasks {
+		isReady := true
+		for _, blockerID := range task.BlockedBy {
+			status, exists := taskStatus[blockerID]
+			if !exists || status != "completed" {
+				isReady = false
+				break
+			}
+		}
+		if isReady {
+			readyTasks = append(readyTasks, task)
+		}
+	}
+
+	return readyTasks, nil
+}
+
+// printDryRunSummary prints a summary of tasks that would be executed
+func printDryRunSummary(tasks []*storage.Task) {
+	fmt.Println("📋 Tasks that would be executed:")
+	fmt.Println()
+	
+	for i, task := range tasks {
+		fmt.Printf("%d. [%s] %s\n", i+1, task.ID, task.Title)
+		fmt.Printf("   Complexity: %s | Model: %s\n", task.Complexity, task.Model)
+		if len(task.BlockedBy) > 0 {
+			fmt.Printf("   Dependencies: %v (all completed)\n", task.BlockedBy)
+		}
+		fmt.Println()
+	}
+	
+	fmt.Printf("Total: %d task(s) ready to execute\n", len(tasks))
 }

@@ -14,6 +14,7 @@ func RunCmd() *cobra.Command {
 		wave            int
 		taskID          string
 		continueSession bool
+		dryRun          bool
 	)
 
 	cmd := &cobra.Command{
@@ -29,12 +30,14 @@ Flags:
   --wave N      Run only tasks in wave N
   --task ID     Run a specific task by ID
   --continue    Resume execution from last checkpoint
+  --dry-run     Show what would be executed without running
 
 Examples:
   devloop run
   devloop run --wave 1
   devloop run --task 1.2
-  devloop run --continue`,
+  devloop run --continue
+  devloop run --dry-run`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config path from persistent flags
 			configPath, _ := cmd.Flags().GetString("config")
@@ -51,7 +54,7 @@ Examples:
 			}
 
 			// Execute dev loop
-			err = executor.ExecuteDevLoop(cfg, wave, taskID, continueSession)
+			err = executor.ExecuteDevLoop(cfg, wave, taskID, continueSession, dryRun)
 			if err != nil {
 				return err
 			}
@@ -64,6 +67,7 @@ Examples:
 	cmd.Flags().IntVar(&wave, "wave", 0, "filter by wave number (0 = all waves)")
 	cmd.Flags().StringVar(&taskID, "task", "", "run specific task by ID")
 	cmd.Flags().BoolVar(&continueSession, "continue", false, "resume from last checkpoint")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be executed without running")
 
 	return cmd
 }
