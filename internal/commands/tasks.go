@@ -9,7 +9,7 @@ import (
 
 	"github.com/ceffo/devloop/internal/config"
 	"github.com/ceffo/devloop/internal/storage"
-	"github.com/fatih/color"
+	"github.com/ceffo/devloop/internal/ui"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -152,20 +152,7 @@ func displayTasksTable(tasks []*storage.Task) {
 
 // formatStatus returns a color-coded status string
 func formatStatus(status string) string {
-	switch status {
-	case "completed":
-		return color.GreenString(status)
-	case "in_progress":
-		return color.YellowString(status)
-	case "failed":
-		return color.RedString(status)
-	case "blocked":
-		return color.MagentaString(status)
-	case "archived":
-		return color.CyanString(status)
-	default:
-		return status
-	}
+	return ui.Status(status)
 }
 
 // formatDuration formats duration in seconds to a human-readable string
@@ -259,14 +246,11 @@ Example:
 
 // displayTaskDetails renders detailed task information
 func displayTaskDetails(task *storage.Task) {
-	bold := color.New(color.Bold)
-	cyan := color.New(color.FgCyan)
-
 	// Header
-	bold.Printf("\n=== Task %s: %s ===\n\n", task.ID, task.Title)
+	fmt.Printf("\n%s\n\n", ui.Heading1(fmt.Sprintf("Task %s: %s", task.ID, task.Title)))
 
 	// Metadata Section
-	cyan.Println("Metadata:")
+	fmt.Println(ui.Heading2("Metadata:"))
 	fmt.Printf("  Wave:         %d\n", task.Wave)
 	fmt.Printf("  Status:       %s\n", formatStatus(task.Status))
 	fmt.Printf("  Complexity:   %s\n", task.Complexity)
@@ -294,7 +278,7 @@ func displayTaskDetails(task *storage.Task) {
 
 	// Description Section
 	fmt.Println()
-	cyan.Println("Description:")
+	fmt.Println(ui.Heading2("Description:"))
 	if task.Description != "" {
 		fmt.Printf("  %s\n", strings.ReplaceAll(task.Description, "\n", "\n  "))
 	} else {
@@ -303,7 +287,7 @@ func displayTaskDetails(task *storage.Task) {
 
 	// Acceptance Criteria Section
 	fmt.Println()
-	cyan.Println("Acceptance Criteria:")
+	fmt.Println(ui.Heading2("Acceptance Criteria:"))
 	if len(task.AcceptanceCriteria) > 0 {
 		for _, criterion := range task.AcceptanceCriteria {
 			fmt.Printf("  • %s\n", criterion)
@@ -314,7 +298,7 @@ func displayTaskDetails(task *storage.Task) {
 
 	// Execution History Section
 	fmt.Println()
-	cyan.Println("Execution History:")
+	fmt.Println(ui.Heading2("Execution History:"))
 	if len(task.Execution.Attempts) > 0 {
 		fmt.Printf("  Total Duration: %s\n", formatDuration(task.Execution.TotalDuration))
 		fmt.Printf("  Attempts:       %d\n\n", len(task.Execution.Attempts))
@@ -362,7 +346,7 @@ func displayTaskDetails(task *storage.Task) {
 	// Results Section (if completed)
 	if task.Results != nil {
 		fmt.Println()
-		cyan.Println("Results:")
+		fmt.Println(ui.Heading2("Results:"))
 		fmt.Printf("  Completed At:  %s\n", task.Results.CompletedAt.Format("2006-01-02 15:04:05"))
 
 		if task.Results.CommitHash != "" {
@@ -392,10 +376,7 @@ func displayTaskDetails(task *storage.Task) {
 
 // formatAttemptResult formats the attempt result with color coding
 func formatAttemptResult(result string, success bool) string {
-	if success {
-		return color.GreenString(result)
-	}
-	return color.RedString(result)
+	return ui.Result(result)
 }
 
 // tasksUpdateCmd returns the tasks update subcommand
@@ -473,7 +454,7 @@ Example:
 
 			// Display success message
 			fmt.Printf("Task %s status updated: %s → %s\n",
-				color.CyanString(taskID),
+				ui.Label(taskID),
 				formatStatus(oldStatus),
 				formatStatus(statusFlag))
 

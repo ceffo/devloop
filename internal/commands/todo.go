@@ -8,7 +8,7 @@ import (
 	"github.com/ceffo/devloop/internal/config"
 	"github.com/ceffo/devloop/internal/processor"
 	"github.com/ceffo/devloop/internal/storage"
-	"github.com/fatih/color"
+	"github.com/ceffo/devloop/internal/ui"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -147,9 +147,8 @@ Examples:
 			}
 
 			// Success message
-			successMsg := color.New(color.FgGreen, color.Bold)
 			tasksFilePath := filepath.Join(cfg.Project.Path, ".devloop", "tasks.jsonl")
-			successMsg.Printf("\n✓ Successfully saved %d task(s) to %s\n", savedCount, tasksFilePath)
+			fmt.Printf("\n%s\n", ui.Success(fmt.Sprintf("Successfully saved %d task(s) to %s", savedCount, tasksFilePath)))
 
 			return nil
 		},

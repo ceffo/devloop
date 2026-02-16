@@ -13,7 +13,7 @@ import (
 	"github.com/ceffo/devloop/internal/config"
 	"github.com/ceffo/devloop/internal/prompts"
 	"github.com/ceffo/devloop/internal/storage"
-	"github.com/fatih/color"
+	"github.com/ceffo/devloop/internal/ui"
 )
 
 // ExecuteDevLoop runs the main dev loop execution engine
@@ -118,7 +118,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		// Check for interrupts
 		select {
 		case <-ctx.Done():
-			fmt.Println("\n⚠️  Execution interrupted by user")
+			fmt.Println("\n" + ui.Warning("Execution interrupted by user"))
 			return printSummary(successCount, failureCount, session)
 		default:
 		}
@@ -131,7 +131,8 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		// Execute task with retries
 		success, err := executeTask(ctx, cfg, store, agentRunner, task)
 		if err != nil {
-			color.Red("✗ Task execution error: %v\n\n", err)
+			fmt.Println(ui.Error(fmt.Sprintf("Task execution error: %v", err)))
+			fmt.Println()
 			failureCount++
 			session.TasksFailed = append(session.TasksFailed, task.ID)
 
@@ -149,11 +150,13 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		}
 
 		if success {
-			color.Green("✓ Task completed successfully\n\n")
+			fmt.Println(ui.Success("Task completed successfully"))
+			fmt.Println()
 			successCount++
 			session.TasksCompleted = append(session.TasksCompleted, task.ID)
 		} else {
-			color.Red("✗ Task failed after all attempts\n\n")
+			fmt.Println(ui.Error("Task failed after all attempts"))
+			fmt.Println()
 			failureCount++
 			session.TasksFailed = append(session.TasksFailed, task.ID)
 
@@ -361,10 +364,10 @@ func printSummary(successCount, failureCount int, session *Session) error {
 	fmt.Printf("\n")
 
 	if successCount > 0 {
-		color.Green("✓ Tasks completed: %d\n", successCount)
+		fmt.Println(ui.Success(fmt.Sprintf("Tasks completed: %d", successCount)))
 	}
 	if failureCount > 0 {
-		color.Red("✗ Tasks failed: %d\n", failureCount)
+		fmt.Println(ui.Error(fmt.Sprintf("Tasks failed: %d", failureCount)))
 	}
 
 	total := successCount + failureCount

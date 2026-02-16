@@ -5,16 +5,8 @@ import (
 	"fmt"
 
 	"github.com/ceffo/devloop/internal/config"
-	"github.com/fatih/color"
+	"github.com/ceffo/devloop/internal/ui"
 	"github.com/spf13/cobra"
-)
-
-var (
-	// Colors for output
-	green = color.New(color.FgGreen)
-	red   = color.New(color.FgRed)
-	cyan  = color.New(color.FgCyan)
-	bold  = color.New(color.Bold)
 )
 
 // ConfigCmd returns the config command
@@ -65,8 +57,8 @@ func configShowCmd() *cobra.Command {
 			}
 
 			// Print header
-			bold.Println("Configuration:")
-			cyan.Printf("Path: %s\n\n", configPath)
+			fmt.Println(ui.Heading2("Configuration:"))
+			fmt.Printf("%s\n\n", ui.LabelValue("Path", configPath))
 
 			// Print JSON (colorized if possible)
 			fmt.Println(string(data))
@@ -92,23 +84,23 @@ func configValidateCmd() *cobra.Command {
 			// Load config
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {
-				red.Printf("✗ Failed to load config: %v\n", err)
+				fmt.Println(ui.Error(fmt.Sprintf("Failed to load config: %v", err)))
 				return err
 			}
 
-			green.Printf("✓ Config loaded successfully from %s\n", configPath)
+			fmt.Println(ui.Success(fmt.Sprintf("Config loaded successfully from %s", configPath)))
 
 			// Validate config
 			if err := cfg.Validate(); err != nil {
-				red.Printf("✗ Validation failed: %v\n", err)
+				fmt.Println(ui.Error(fmt.Sprintf("Validation failed: %v", err)))
 				return err
 			}
 
-			green.Println("✓ Configuration is valid")
+			fmt.Println(ui.Success("Configuration is valid"))
 
 			// Print summary
 			fmt.Println()
-			bold.Println("Configuration Summary:")
+			fmt.Println(ui.Heading2("Configuration Summary:"))
 			fmt.Printf("  Project:       %s\n", cfg.Project.Name)
 			fmt.Printf("  Path:          %s\n", cfg.Project.Path)
 			fmt.Printf("  Tech Stack:    %s\n", cfg.Project.TechStack)
