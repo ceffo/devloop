@@ -217,8 +217,20 @@ func TestCreateInitialConfig(t *testing.T) {
 		t.Errorf("Execution.MaxAttempts = %d, want %d", cfg.Execution.MaxAttempts, 2)
 	}
 
-	if cfg.CLI.Tool != "claude" {
-		t.Errorf("CLI.Tool = %q, want %q", cfg.CLI.Tool, "claude")
+	if cfg.CLI.DefaultAgent != "claude" {
+		t.Errorf("CLI.DefaultAgent = %q, want %q", cfg.CLI.DefaultAgent, "claude")
+	}
+
+	if len(cfg.CLI.Agents) != 2 {
+		t.Errorf("CLI.Agents length = %d, want 2", len(cfg.CLI.Agents))
+	}
+
+	if _, exists := cfg.CLI.Agents["claude"]; !exists {
+		t.Error("claude agent not found in CLI.Agents")
+	}
+
+	if _, exists := cfg.CLI.Agents["copilot"]; !exists {
+		t.Error("copilot agent not found in CLI.Agents")
 	}
 }
 

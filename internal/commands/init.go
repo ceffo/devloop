@@ -185,11 +185,24 @@ func createInitialConfig(name, path, techStack string) *config.Config {
 			TimeoutSeconds: 300,
 		},
 		CLI: config.CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple":   "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex":  "claude-opus-4-6",
+			DefaultAgent: "claude",
+			Agents: map[string]*config.AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple":   "claude-haiku-4-5-20251001",
+						"moderate": "claude-sonnet-4-5-20250929",
+						"complex":  "claude-opus-4-6",
+					},
+				},
+				"copilot": {
+					Tool: "copilot",
+					Models: map[string]string{
+						"simple":   "gpt-5-mini",
+						"moderate": "gpt-5.1",
+						"complex":  "gpt-5.2",
+					},
+				},
 			},
 		},
 		Execution: config.ExecutionConfig{
