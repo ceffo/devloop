@@ -1,4 +1,4 @@
-module github.com/yourusername/devloop
+module github.com/ceffo/devloop
 
 go 1.25.5
 

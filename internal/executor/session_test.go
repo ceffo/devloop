@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yourusername/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/config"
 )
 
 func TestLoadSession_NewSession(t *testing.T) {

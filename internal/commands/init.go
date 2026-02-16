@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yourusername/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -127,18 +127,18 @@ func detectProjectName(cwd string) string {
 func detectTechStack(cwd string) string {
 	// Check for common project files
 	checks := map[string]string{
-		"package.json": "Node.js",
-		"go.mod":       "Go",
-		"Cargo.toml":   "Rust",
-		"pom.xml":      "Java (Maven)",
-		"build.gradle": "Java (Gradle)",
+		"package.json":     "Node.js",
+		"go.mod":           "Go",
+		"Cargo.toml":       "Rust",
+		"pom.xml":          "Java (Maven)",
+		"build.gradle":     "Java (Gradle)",
 		"requirements.txt": "Python",
-		"Pipfile":      "Python (Pipenv)",
-		"pyproject.toml": "Python",
-		"Gemfile":      "Ruby",
-		"composer.json": "PHP",
-		"mix.exs":      "Elixir",
-		"Package.swift": "Swift",
+		"Pipfile":          "Python (Pipenv)",
+		"pyproject.toml":   "Python",
+		"Gemfile":          "Ruby",
+		"composer.json":    "PHP",
+		"mix.exs":          "Elixir",
+		"Package.swift":    "Swift",
 	}
 
 	var detected []string

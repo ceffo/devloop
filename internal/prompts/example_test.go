@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/processor"
-	"github.com/yourusername/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/processor"
+	"github.com/ceffo/devloop/internal/storage"
 )
 
 // ExampleRenderTodoPrompt demonstrates the TODO processing prompt rendering

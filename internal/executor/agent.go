@@ -2,9 +2,9 @@ package executor
 
 // This file is deprecated. AgentRunner has been moved to internal/agent package.
 // Kept for backwards compatibility with existing code.
-// Import github.com/yourusername/devloop/internal/agent instead.
+// Import github.com/ceffo/devloop/internal/agent instead.
 
-import "github.com/yourusername/devloop/internal/agent"
+import "github.com/ceffo/devloop/internal/agent"
 
 // Re-export types from agent package for backwards compatibility
 type AgentRunner = agent.AgentRunner

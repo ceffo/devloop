@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/storage"
 )
 
 // AutoCommit creates a git commit for a completed task

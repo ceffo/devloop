@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yourusername/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/config"
 )
 
 func TestRunVerification_Success(t *testing.T) {

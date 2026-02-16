@@ -13,9 +13,9 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/yourusername/devloop/internal/agent"
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/agent"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/storage"
 )
 
 // TodoItem represents a single TODO item parsed from a markdown file.

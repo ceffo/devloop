@@ -7,6 +7,7 @@ Agent-driven development workflow system.
 `devloop` is a project-agnostic tool for automating development workflows using AI agents. It replaces brittle bash scripts with a structured, queryable, crash-safe system for managing and executing development tasks.
 
 **Key Features:**
+
 - 🤖 **Intelligent TODO processing**: AI agent analyzes and groups TODO items into executable tasks
 - 📊 **Rich metadata**: Track attempts, duration, errors, dependencies
 - 🔍 **Queryable state**: Complex filtering and reporting on task status
@@ -18,13 +19,13 @@ Agent-driven development workflow system.
 ## Installation
 
 ```bash
-go install github.com/yourusername/devloop/cmd/devloop@latest
+go install github.com/ceffo/devloop/cmd/devloop@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/yourusername/devloop
+git clone https://github.com/ceffo/devloop
 cd devloop
 go build -o devloop ./cmd/devloop
 ```
@@ -52,12 +53,14 @@ devloop session status
 See [docs/DESIGN.md](docs/DESIGN.md) for full architecture documentation.
 
 **Storage:**
+
 - Tasks stored in `.devloop/tasks.jsonl` (append-only JSONL)
 - Configuration in `.devloop/config.json`
 - Logs in `.devloop/logs/`
 - Archived tasks in `.devloop/archive/`
 
 **Workflow:**
+
 1. TODO items → AI agent → Structured tasks
 2. Tasks → AI agent execution with retries
 3. Verification after each attempt

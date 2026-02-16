@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/processor"
-	"github.com/yourusername/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/processor"
+	"github.com/ceffo/devloop/internal/storage"
 )
 
 func TestRenderTodoPrompt(t *testing.T) {
@@ -271,7 +271,7 @@ func TestRenderTaskPrompt(t *testing.T) {
 				Verification: config.VerificationConfig{
 					Command: "rspec",
 				},
-				Files: config.FilesConfig{},
+				Files:   config.FilesConfig{},
 				Prompts: config.PromptsConfig{},
 			},
 			task: &storage.Task{

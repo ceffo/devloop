@@ -5,12 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/processor"
+	"github.com/ceffo/devloop/internal/storage"
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/processor"
-	"github.com/yourusername/devloop/internal/storage"
 )
 
 // TodoCmd returns the todo command with subcommands

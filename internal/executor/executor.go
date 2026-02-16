@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ceffo/devloop/internal/agent"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/prompts"
+	"github.com/ceffo/devloop/internal/storage"
 	"github.com/fatih/color"
-	"github.com/yourusername/devloop/internal/agent"
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/prompts"
-	"github.com/yourusername/devloop/internal/storage"
 )
 
 // ExecuteDevLoop runs the main dev loop execution engine

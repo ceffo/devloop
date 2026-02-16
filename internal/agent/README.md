@@ -17,7 +17,7 @@ The `agent` package was created to break an import cycle between `executor` and 
 ## Usage
 
 ```go
-import "github.com/yourusername/devloop/internal/agent"
+import "github.com/ceffo/devloop/internal/agent"
 
 // Create a runner for a specific tool
 runner, err := agent.NewAgentRunner("claude")
@@ -39,6 +39,7 @@ if result.Success {
 ## Architecture
 
 The package dependency graph:
+
 - `agent` (no dependencies on executor/processor)
 - `prompts` imports `processor`
 - `executor` imports `agent` and `prompts`

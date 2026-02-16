@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/storage"
 )
 
 func TestGenerateCommitMessage(t *testing.T) {
@@ -170,12 +170,12 @@ func TestAutoCommit(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		config         *config.Config
-		task           *storage.Task
-		createChanges  bool
-		wantErr        bool
-		errContains    string
+		name          string
+		config        *config.Config
+		task          *storage.Task
+		createChanges bool
+		wantErr       bool
+		errContains   string
 	}{
 		{
 			name: "successful commit with changes",

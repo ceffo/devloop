@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/yourusername/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/config"
 )
 
 // Storage handles JSONL read/write operations for tasks

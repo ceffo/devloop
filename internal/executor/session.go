@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ceffo/devloop/internal/config"
 	"github.com/google/uuid"
-	"github.com/yourusername/devloop/internal/config"
 )
 
 // Session represents a dev loop execution session for crash recovery

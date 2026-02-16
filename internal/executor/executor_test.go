@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/storage"
 )
 
 // mockAgentRunner is a mock implementation of AgentRunner for testing

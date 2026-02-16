@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/yourusername/devloop/internal/agent"
+	"github.com/ceffo/devloop/internal/agent"
 )
 
 // Example demonstrates how to use the AgentRunner interface

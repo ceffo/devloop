@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/storage"
 )
 
 func TestParseTodoFile(t *testing.T) {
@@ -132,8 +132,8 @@ func TestParseTodoFile(t *testing.T) {
 			},
 		},
 		{
-			name: "empty file",
-			content: ``,
+			name:     "empty file",
+			content:  ``,
 			expected: []TodoItem{},
 		},
 		{
@@ -261,7 +261,7 @@ func TestParseTodoFile_ComplexExample(t *testing.T) {
 	for i, item := range items {
 		exp := expected[i]
 		if item.ID != exp.ID || item.Category != exp.Category ||
-		   item.Content != exp.Content || item.Priority != exp.Priority {
+			item.Content != exp.Content || item.Priority != exp.Priority {
 			t.Errorf("Item %d mismatch:\ngot:  %+v\nwant: %+v", i, item, exp)
 		}
 	}

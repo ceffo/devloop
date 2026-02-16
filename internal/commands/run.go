@@ -3,9 +3,9 @@ package commands
 import (
 	"fmt"
 
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/executor"
 	"github.com/spf13/cobra"
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/executor"
 )
 
 // RunCmd returns the run command

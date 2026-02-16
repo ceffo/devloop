@@ -6,9 +6,9 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/processor"
-	"github.com/yourusername/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/processor"
+	"github.com/ceffo/devloop/internal/storage"
 )
 
 // TodoProcessingPrompt is the template for converting TODO items into structured tasks

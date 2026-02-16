@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/yourusername/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/config"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )

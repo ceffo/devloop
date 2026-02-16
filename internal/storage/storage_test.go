@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yourusername/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/config"
 )
 
 // Helper function to create a test config with a temporary directory
@@ -47,12 +47,12 @@ func createTestConfig(t *testing.T) (*config.Config, string) {
 func createSampleTask(id, title, status string) *Task {
 	now := time.Now()
 	return &Task{
-		ID:         id,
-		Title:      title,
-		Wave:       1,
-		Status:     status,
-		Complexity: "simple",
-		Model:      "claude-haiku-4-5-20251001",
+		ID:          id,
+		Title:       title,
+		Wave:        1,
+		Status:      status,
+		Complexity:  "simple",
+		Model:       "claude-haiku-4-5-20251001",
 		Description: "Test task description",
 		AcceptanceCriteria: []string{
 			"Criterion 1",

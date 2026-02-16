@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/storage"
 )
 
 func TestTasksListCommand(t *testing.T) {
@@ -317,12 +317,12 @@ func TestTasksShowCommand(t *testing.T) {
 	store := storage.NewStorage(cfg)
 
 	task := &storage.Task{
-		ID:         "1.1",
-		Title:      "Setup project structure",
-		Wave:       1,
-		Status:     "completed",
-		Complexity: "simple",
-		Model:      "claude-haiku-4-5-20251001",
+		ID:          "1.1",
+		Title:       "Setup project structure",
+		Wave:        1,
+		Status:      "completed",
+		Complexity:  "simple",
+		Model:       "claude-haiku-4-5-20251001",
 		Description: "Initialize project with proper directory structure and dependencies",
 		AcceptanceCriteria: []string{
 			"Directory structure created",
@@ -626,4 +626,3 @@ func TestTasksUpdateCommand(t *testing.T) {
 		}
 	})
 }
-
