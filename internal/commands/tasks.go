@@ -185,6 +185,16 @@ func truncateTitle(title string, maxLen int) string {
 	return title[:maxLen-3] + "..."
 }
 
+// indentText indents each line of text by the specified number of spaces
+func indentText(text string, spaces int) string {
+	indent := strings.Repeat(" ", spaces)
+	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	for i, line := range lines {
+		lines[i] = indent + line
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
 // tasksShowCmd returns the tasks show subcommand
 func tasksShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -272,7 +282,14 @@ func displayTaskDetails(task *storage.Task) {
 	fmt.Println()
 	fmt.Println(ui.Heading2("Description:"))
 	if task.Description != "" {
-		fmt.Printf("  %s\n", strings.ReplaceAll(task.Description, "\n", "\n  "))
+		rendered, err := ui.RenderMarkdown(task.Description)
+		if err != nil {
+			// Fallback to plain text if markdown rendering fails
+			fmt.Printf("  %s\n", strings.ReplaceAll(task.Description, "\n", "\n  "))
+		} else {
+			// Indent the rendered markdown
+			fmt.Print(indentText(rendered, 2))
+		}
 	} else {
 		fmt.Println("  (no description)")
 	}
