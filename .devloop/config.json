@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "devloop",
+    "path": "/home/moncef/code/devloop",
+    "tech_stack": "Go 1.21+",
+    "main_branch": "main"
+  },
+  "verification": {
+    "command": "go test ./... && go build ./cmd/devloop",
+    "timeout_seconds": 300
+  },
+  "cli": {
+    "tool": "claude",
+    "models": {
+      "simple": "claude-haiku-4-5-20251001",
+      "moderate": "claude-sonnet-4-5-20250929",
+      "complex": "claude-opus-4-6"
+    }
+  },
+  "execution": {
+    "max_attempts": 2,
+    "halt_on_failure": true,
+    "auto_commit": true,
+    "commit_format": "task {task_id}: {title}"
+  },
+  "files": {
+    "prd": "docs/DESIGN.md",
+    "tasks": "docs/TASKS.md",
+    "agents": "CLAUDE.md",
+    "todo": ""
+  },
+  "archival": {
+    "auto_archive": true,
+    "age_days": 0,
+    "output_dir": ".devloop/archive"
+  },
+  "prompts": {
+    "task_context_files": [
+      "docs/DESIGN.md",
+      "CLAUDE.md",
+      "README.md"
+    ],
+    "custom_instructions": "Follow Go conventions. Keep it simple. Test as you go."
+  }
+}
