@@ -6,11 +6,30 @@ import (
 	"os"
 )
 
-// knownModels is the list of valid Claude model identifiers
+// knownModels is the list of valid model identifiers for both Claude and Copilot
 var knownModels = map[string]bool{
+	// Claude CLI models
 	"claude-haiku-4-5-20251001":  true,
 	"claude-sonnet-4-5-20250929": true,
 	"claude-opus-4-6":            true,
+	// GitHub Copilot CLI models
+	"claude-sonnet-4.5":    true,
+	"claude-haiku-4.5":     true,
+	"claude-opus-4.6":      true,
+	"claude-opus-4.6-fast": true,
+	"claude-opus-4.5":      true,
+	"claude-sonnet-4":      true,
+	"gemini-3-pro-preview": true,
+	"gpt-5.3-codex":        true,
+	"gpt-5.2-codex":        true,
+	"gpt-5.2":              true,
+	"gpt-5.1-codex-max":    true,
+	"gpt-5.1-codex":        true,
+	"gpt-5.1":              true,
+	"gpt-5":                true,
+	"gpt-5.1-codex-mini":   true,
+	"gpt-5-mini":           true,
+	"gpt-4.1":              true,
 }
 
 // Validate checks if the configuration is valid

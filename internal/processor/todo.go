@@ -311,6 +311,26 @@ func generateNextTaskID(store *storage.Storage) (string, error) {
 
 // parseTasksFromJSON extracts tasks from the AI agent's JSON output
 func parseTasksFromJSON(output string, cfg *config.Config, todos []TodoItem) ([]*storage.Task, error) {
+	// Extract just the output section if log format is present
+	if idx := strings.Index(output, "=== Output ==="); idx != -1 {
+		output = output[idx+len("=== Output ==="):]
+	}
+
+	// Remove markdown code blocks if present (```json ... ```)
+	output = strings.TrimSpace(output)
+	if strings.HasPrefix(output, "```json") {
+		output = strings.TrimPrefix(output, "```json")
+		if idx := strings.LastIndex(output, "```"); idx != -1 {
+			output = output[:idx]
+		}
+	} else if strings.HasPrefix(output, "```") {
+		output = strings.TrimPrefix(output, "```")
+		if idx := strings.LastIndex(output, "```"); idx != -1 {
+			output = output[:idx]
+		}
+	}
+	output = strings.TrimSpace(output)
+
 	// Extract JSON array from output (AI might include additional text)
 	// Look for the JSON array pattern [...]
 	start := strings.Index(output, "[")

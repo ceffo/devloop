@@ -23,21 +23,21 @@ func TestNewCopilotRunner(t *testing.T) {
 
 func TestNewAgentRunner(t *testing.T) {
 	tests := []struct {
-		name        string
-		tool        string
-		wantErr     bool
+		name         string
+		tool         string
+		wantErr      bool
 		expectedType string
 	}{
 		{
-			name:        "claude tool",
-			tool:        "claude",
-			wantErr:     false,
+			name:         "claude tool",
+			tool:         "claude",
+			wantErr:      false,
 			expectedType: "*agent.ClaudeRunner",
 		},
 		{
-			name:        "copilot tool",
-			tool:        "copilot",
-			wantErr:     false,
+			name:         "copilot tool",
+			tool:         "copilot",
+			wantErr:      false,
 			expectedType: "*agent.CopilotRunner",
 		},
 		{

@@ -9,14 +9,14 @@ import (
 
 // Config represents the complete devloop configuration
 type Config struct {
-	Version     string            `json:"version"`
-	Project     ProjectConfig     `json:"project"`
+	Version      string             `json:"version"`
+	Project      ProjectConfig      `json:"project"`
 	Verification VerificationConfig `json:"verification"`
-	CLI         CLIConfig         `json:"cli"`
-	Execution   ExecutionConfig   `json:"execution"`
-	Files       FilesConfig       `json:"files"`
-	Archival    ArchivalConfig    `json:"archival,omitempty"`
-	Prompts     PromptsConfig     `json:"prompts,omitempty"`
+	CLI          CLIConfig          `json:"cli"`
+	Execution    ExecutionConfig    `json:"execution"`
+	Files        FilesConfig        `json:"files"`
+	Archival     ArchivalConfig     `json:"archival,omitempty"`
+	Prompts      PromptsConfig      `json:"prompts,omitempty"`
 }
 
 // ProjectConfig holds project-specific metadata
@@ -41,10 +41,10 @@ type CLIConfig struct {
 
 // ExecutionConfig controls task execution behavior
 type ExecutionConfig struct {
-	MaxAttempts    int    `json:"max_attempts"`
-	HaltOnFailure  bool   `json:"halt_on_failure"`
-	AutoCommit     bool   `json:"auto_commit"`
-	CommitFormat   string `json:"commit_format,omitempty"`
+	MaxAttempts   int    `json:"max_attempts"`
+	HaltOnFailure bool   `json:"halt_on_failure"`
+	AutoCommit    bool   `json:"auto_commit"`
+	CommitFormat  string `json:"commit_format,omitempty"`
 }
 
 // FilesConfig maps to project artifact locations

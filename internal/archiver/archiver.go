@@ -14,10 +14,10 @@ type ArchiveEntry struct {
 
 // ArchiveResult holds summary statistics and output path for an archive operation.
 type ArchiveResult struct {
-	Total      int               `json:"total"`
-	Completed  int               `json:"completed"`
-	ByWave     map[string]int    `json:"by_wave,omitempty"`
-	OutputPath string            `json:"output_path,omitempty"`
+	Total      int            `json:"total"`
+	Completed  int            `json:"completed"`
+	ByWave     map[string]int `json:"by_wave,omitempty"`
+	OutputPath string         `json:"output_path,omitempty"`
 }
 
 // ArchiveOptions provide filters and flags for archive generation.
