@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ceffo/devloop/internal/config"
@@ -139,6 +140,73 @@ func (a *Archiver) ExportWave(wave int) (*ArchiveResult, error) {
 		Completed:  len(tasks),
 		OutputPath: archivePath,
 	}, nil
+}
+
+// GenerateMarkdownSummary creates a human-readable markdown summary for archived tasks
+func (a *Archiver) GenerateMarkdownSummary(wave int, tasks []*storage.Task) (string, error) {
+	if len(tasks) == 0 {
+		return "", nil
+	}
+
+	var buf strings.Builder
+
+	// Title and metadata
+	buf.WriteString(fmt.Sprintf("# Wave %d Archive Summary\n\n", wave))
+
+	// Completion date
+	now := time.Now()
+	buf.WriteString(fmt.Sprintf("**Archived:** %s\n\n", now.Format("2006-01-02 15:04:05 MST")))
+
+	// Task list with statuses
+	buf.WriteString("## Tasks\n\n")
+	for _, task := range tasks {
+		status := strings.ToLower(task.Status)
+		if status == "archived" {
+			status = "completed"
+		}
+		buf.WriteString(fmt.Sprintf("- [x] **%s**: %s (%s)\n", task.ID, task.Title, status))
+	}
+
+	// Aggregate statistics
+	buf.WriteString("\n## Statistics\n\n")
+	completedCount := 0
+	for _, task := range tasks {
+		if task.Status == "completed" || task.Status == "archived" {
+			completedCount++
+		}
+	}
+
+	totalDuration := 0
+	for _, task := range tasks {
+		totalDuration += task.Execution.TotalDuration
+	}
+
+	completionRate := 0.0
+	if len(tasks) > 0 {
+		completionRate = (float64(completedCount) / float64(len(tasks))) * 100
+	}
+
+	buf.WriteString(fmt.Sprintf("- **Total Tasks:** %d\n", len(tasks)))
+	buf.WriteString(fmt.Sprintf("- **Completed:** %d\n", completedCount))
+	buf.WriteString(fmt.Sprintf("- **Completion Rate:** %.1f%%\n", completionRate))
+	buf.WriteString(fmt.Sprintf("- **Total Duration:** %d seconds\n", totalDuration))
+
+	return buf.String(), nil
+}
+
+// WriteMarkdownSummary writes the markdown summary to .devloop/archive/wave-N.md
+func (a *Archiver) WriteMarkdownSummary(wave int, markdown string) (string, error) {
+	archiveDir := filepath.Join(a.cfg.Project.Path, ".devloop", "archive")
+	if err := os.MkdirAll(archiveDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create archive directory: %w", err)
+	}
+
+	mdPath := filepath.Join(archiveDir, fmt.Sprintf("wave-%d.md", wave))
+	if err := os.WriteFile(mdPath, []byte(markdown), 0644); err != nil {
+		return "", fmt.Errorf("failed to write markdown summary: %w", err)
+	}
+
+	return mdPath, nil
 }
 
 // updateArchiveIndex updates the archive index file with wave metadata
