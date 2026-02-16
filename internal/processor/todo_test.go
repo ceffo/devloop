@@ -1,9 +1,13 @@
 package processor
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/yourusername/devloop/internal/config"
+	"github.com/yourusername/devloop/internal/storage"
 )
 
 func TestParseTodoFile(t *testing.T) {
@@ -261,4 +265,314 @@ func TestParseTodoFile_ComplexExample(t *testing.T) {
 			t.Errorf("Item %d mismatch:\ngot:  %+v\nwant: %+v", i, item, exp)
 		}
 	}
+}
+
+func TestGenerateNextTaskID(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing []storage.Task
+		expected string
+	}{
+		{
+			name:     "no existing tasks",
+			existing: []storage.Task{},
+			expected: "1.1",
+		},
+		{
+			name: "single task in wave 1",
+			existing: []storage.Task{
+				{ID: "1.1"},
+			},
+			expected: "1.2",
+		},
+		{
+			name: "multiple tasks in wave 1",
+			existing: []storage.Task{
+				{ID: "1.1"},
+				{ID: "1.2"},
+				{ID: "1.3"},
+			},
+			expected: "1.4",
+		},
+		{
+			name: "multiple waves",
+			existing: []storage.Task{
+				{ID: "1.1"},
+				{ID: "1.2"},
+				{ID: "2.1"},
+				{ID: "2.2"},
+			},
+			expected: "2.3",
+		},
+		{
+			name: "out of order tasks",
+			existing: []storage.Task{
+				{ID: "1.3"},
+				{ID: "2.1"},
+				{ID: "1.1"},
+				{ID: "1.2"},
+			},
+			expected: "2.2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp directory and storage
+			tmpDir := t.TempDir()
+			cfg := &config.Config{
+				Project: config.ProjectConfig{
+					Path: tmpDir,
+				},
+			}
+			store := storage.NewStorage(cfg)
+
+			// Save existing tasks
+			for i := range tt.existing {
+				if err := store.SaveTask(&tt.existing[i]); err != nil {
+					t.Fatalf("failed to save task: %v", err)
+				}
+			}
+
+			// Generate next ID
+			got, err := generateNextTaskID(store)
+			if err != nil {
+				t.Fatalf("generateNextTaskID() error = %v", err)
+			}
+
+			if got != tt.expected {
+				t.Errorf("generateNextTaskID() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseTasksFromJSON(t *testing.T) {
+	cfg := &config.Config{
+		CLI: config.CLIConfig{
+			Models: map[string]string{
+				"simple":   "model-simple",
+				"moderate": "model-moderate",
+				"complex":  "model-complex",
+			},
+		},
+		Execution: config.ExecutionConfig{
+			MaxAttempts: 2,
+		},
+	}
+
+	todos := []TodoItem{
+		{ID: "TODO-1", Content: "Test item"},
+	}
+
+	tests := []struct {
+		name       string
+		output     string
+		wantErr    bool
+		wantCount  int
+		checkFirst func(t *testing.T, task *storage.Task)
+	}{
+		{
+			name: "valid JSON array",
+			output: `[
+				{
+					"id": "1.1",
+					"title": "Test task",
+					"description": "Test description",
+					"complexity": "simple",
+					"acceptance_criteria": ["Criterion 1", "Criterion 2"],
+					"blocked_by": [],
+					"tags": ["test"]
+				}
+			]`,
+			wantErr:   false,
+			wantCount: 1,
+			checkFirst: func(t *testing.T, task *storage.Task) {
+				if task.ID != "1.1" {
+					t.Errorf("ID = %q, want %q", task.ID, "1.1")
+				}
+				if task.Title != "Test task" {
+					t.Errorf("Title = %q, want %q", task.Title, "Test task")
+				}
+				if task.Complexity != "simple" {
+					t.Errorf("Complexity = %q, want %q", task.Complexity, "simple")
+				}
+				if task.Model != "model-simple" {
+					t.Errorf("Model = %q, want %q", task.Model, "model-simple")
+				}
+				if task.Status != "pending" {
+					t.Errorf("Status = %q, want %q", task.Status, "pending")
+				}
+				if task.Wave != 1 {
+					t.Errorf("Wave = %d, want %d", task.Wave, 1)
+				}
+				if len(task.AcceptanceCriteria) != 2 {
+					t.Errorf("len(AcceptanceCriteria) = %d, want %d", len(task.AcceptanceCriteria), 2)
+				}
+			},
+		},
+		{
+			name: "JSON with surrounding text",
+			output: `Here are the tasks:
+			[
+				{
+					"id": "2.1",
+					"title": "Another task",
+					"description": "Description",
+					"complexity": "moderate",
+					"acceptance_criteria": ["Test"],
+					"blocked_by": ["1.1"],
+					"tags": []
+				}
+			]
+			That's the end.`,
+			wantErr:   false,
+			wantCount: 1,
+			checkFirst: func(t *testing.T, task *storage.Task) {
+				if task.Model != "model-moderate" {
+					t.Errorf("Model = %q, want %q", task.Model, "model-moderate")
+				}
+				if len(task.BlockedBy) != 1 || task.BlockedBy[0] != "1.1" {
+					t.Errorf("BlockedBy = %v, want [\"1.1\"]", task.BlockedBy)
+				}
+			},
+		},
+		{
+			name:      "no JSON array",
+			output:    "This is just text without JSON",
+			wantErr:   true,
+			wantCount: 0,
+		},
+		{
+			name:      "invalid JSON",
+			output:    "[{invalid json}]",
+			wantErr:   true,
+			wantCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tasks, err := parseTasksFromJSON(tt.output, cfg, todos)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseTasksFromJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr {
+				if len(tasks) != tt.wantCount {
+					t.Errorf("got %d tasks, want %d", len(tasks), tt.wantCount)
+					return
+				}
+
+				if tt.wantCount > 0 && tt.checkFirst != nil {
+					tt.checkFirst(t, tasks[0])
+				}
+			}
+		})
+	}
+}
+
+func TestExtractWaveFromID(t *testing.T) {
+	tests := []struct {
+		id   string
+		want int
+	}{
+		{"1.1", 1},
+		{"2.3", 2},
+		{"10.5", 10},
+		{"invalid", 1},
+		{"1", 1},
+		{"", 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.id, func(t *testing.T) {
+			got := extractWaveFromID(tt.id)
+			if got != tt.want {
+				t.Errorf("extractWaveFromID(%q) = %d, want %d", tt.id, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRenderTodoPrompt(t *testing.T) {
+	project := config.ProjectConfig{
+		Name:      "TestProject",
+		TechStack: "Go 1.21",
+		Path:      "/test/path",
+	}
+
+	todos := []TodoItem{
+		{ID: "TODO-1", Category: "Features", Content: "Add feature X", Priority: "high"},
+		{ID: "TODO-2", Category: "Bugs", Content: "Fix bug Y", Priority: "medium"},
+	}
+
+	prompt, err := renderTodoPrompt(project, todos, "1.1")
+	if err != nil {
+		t.Fatalf("renderTodoPrompt() error = %v", err)
+	}
+
+	// Check that prompt contains expected elements
+	expectedElements := []string{
+		"TestProject",
+		"Go 1.21",
+		"/test/path",
+		"TODO-1",
+		"TODO-2",
+		"Features",
+		"Bugs",
+		"Add feature X",
+		"Fix bug Y",
+		"1.1",
+		"high",
+		"medium",
+	}
+
+	for _, elem := range expectedElements {
+		if !contains(prompt, elem) {
+			t.Errorf("renderTodoPrompt() output missing %q", elem)
+		}
+	}
+}
+
+func TestTaskJSON_Unmarshal(t *testing.T) {
+	jsonData := `{
+		"id": "1.1",
+		"title": "Test",
+		"description": "Desc",
+		"complexity": "simple",
+		"acceptance_criteria": ["a", "b"],
+		"blocked_by": ["1.0"],
+		"tags": ["tag1"]
+	}`
+
+	var task taskJSON
+	if err := json.Unmarshal([]byte(jsonData), &task); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	if task.ID != "1.1" {
+		t.Errorf("ID = %q, want %q", task.ID, "1.1")
+	}
+	if task.Title != "Test" {
+		t.Errorf("Title = %q, want %q", task.Title, "Test")
+	}
+	if len(task.AcceptanceCriteria) != 2 {
+		t.Errorf("len(AcceptanceCriteria) = %d, want 2", len(task.AcceptanceCriteria))
+	}
+}
+
+// Helper function
+func contains(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) > len(substr) && hasSubstring(s, substr))
+}
+
+func hasSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
