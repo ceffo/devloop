@@ -115,16 +115,16 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 
 	fmt.Printf("Found %d task(s) to execute\n\n", len(tasks))
 
-	// If dry-run mode, just print tasks and exit
-	if dryRun {
-		printDryRunSummary(tasks)
-		return nil
-	}
-
 	// Get agent config
 	agentConfig, err := cfg.CLI.GetAgent(agentName)
 	if err != nil {
 		return fmt.Errorf("failed to get agent configuration: %w", err)
+	}
+
+	// If dry-run mode, just print tasks and exit
+	if dryRun {
+		printDryRunSummary(tasks, agentConfig)
+		return nil
 	}
 
 	// Initialize agent runner
@@ -154,11 +154,32 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 
 		fmt.Printf("═══════════════════════════════════════════════════════════\n")
 		fmt.Printf("Task %d/%d: %s - %s\n", i+1, len(tasks), task.ID, task.Title)
-		fmt.Printf("Complexity: %s | Model: %s | Agent: %s\n", task.Complexity, task.Model, selectedAgentName)
+		// Get model for this task based on its complexity
+		model, err := agentConfig.GetModel(task.Complexity)
+		if err != nil {
+			fmt.Println(ui.Error(fmt.Sprintf("Invalid task complexity: %v", err)))
+			fmt.Println()
+			failureCount++
+			session.TasksFailed = append(session.TasksFailed, task.ID)
+
+			// Save session state
+			CheckpointSession(session, task.ID)
+			if err := SaveSession(cfg, session); err != nil {
+				fmt.Printf("Warning: failed to save session: %v\n", err)
+			}
+
+			if cfg.Execution.HaltOnFailure {
+				fmt.Println("⚠️  Halting execution due to task failure (halt_on_failure=true)")
+				return printSummary(successCount, failureCount, session)
+			}
+			continue
+		}
+
+		fmt.Printf("Complexity: %s | Model: %s | Agent: %s\n", task.Complexity, model, selectedAgentName)
 		fmt.Printf("═══════════════════════════════════════════════════════════\n\n")
 
 		// Execute task with retries
-		success, err := executeTask(ctx, cfg, store, agentRunner, task)
+		success, err := executeTask(ctx, cfg, store, agentRunner, task, model)
 		if err != nil {
 			fmt.Println(ui.Error(fmt.Sprintf("Task execution error: %v", err)))
 			fmt.Println()
@@ -212,7 +233,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 
 // executeTask executes a single task with retry logic
 // Returns (success, error)
-func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.AgentRunner, task *storage.Task) (bool, error) {
+func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.AgentRunner, task *storage.Task, model string) (bool, error) {
 	// Mark task as in progress
 	task.Status = "in_progress"
 	task.Metadata.UpdatedAt = time.Now()
@@ -247,9 +268,9 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 
 		// Execute agent
 		startTime := time.Now()
-		fmt.Printf("  → Running AI agent (%s)...\n", task.Model)
+		fmt.Printf("  → Running AI agent (%s)...\n", model)
 
-		agentResult, err := runner.Run(task.Model, prompt, logPath)
+		agentResult, err := runner.Run(model, prompt, logPath)
 		duration := int(time.Since(startTime).Seconds())
 
 		if err != nil {
@@ -262,7 +283,7 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 			StartedAt:     startTime,
 			CompletedAt:   time.Now(),
 			Duration:      duration,
-			Model:         task.Model,
+			Model:         model,
 			Success:       agentResult.Success,
 			LogPath:       logPath,
 		}
@@ -448,18 +469,19 @@ func filterReadyTasks(store *storage.Storage, pendingTasks []*storage.Task) ([]*
 }
 
 // printDryRunSummary prints a summary of tasks that would be executed
-func printDryRunSummary(tasks []*storage.Task) {
+func printDryRunSummary(tasks []*storage.Task, agentConfig *config.AgentConfig) {
 	fmt.Println("📋 Tasks that would be executed:")
 	fmt.Println()
-	
+
 	for i, task := range tasks {
 		fmt.Printf("%d. [%s] %s\n", i+1, task.ID, task.Title)
-		fmt.Printf("   Complexity: %s | Model: %s\n", task.Complexity, task.Model)
+		model, _ := agentConfig.GetModel(task.Complexity)
+		fmt.Printf("   Complexity: %s | Model: %s\n", task.Complexity, model)
 		if len(task.BlockedBy) > 0 {
 			fmt.Printf("   Dependencies: %v (all completed)\n", task.BlockedBy)
 		}
 		fmt.Println()
 	}
-	
+
 	fmt.Printf("Total: %d task(s) ready to execute\n", len(tasks))
 }

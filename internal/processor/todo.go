@@ -355,13 +355,6 @@ func parseTasksFromJSON(output string, cfg *config.Config, todos []TodoItem) ([]
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
-	// Get default agent config for model mapping
-	defaultAgentName := cfg.CLI.GetDefaultAgentName()
-	agentConfig, err := cfg.CLI.GetAgent(defaultAgentName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get default agent configuration: %w", err)
-	}
-
 	// Convert to Task structs
 	var tasks []*storage.Task
 	now := time.Now()
@@ -369,13 +362,6 @@ func parseTasksFromJSON(output string, cfg *config.Config, todos []TodoItem) ([]
 	for _, tj := range taskJSONs {
 		// Determine wave from task ID
 		wave := extractWaveFromID(tj.ID)
-
-		// Assign model based on complexity
-		model := agentConfig.Models[tj.Complexity]
-		if model == "" {
-			// Default to moderate if complexity not recognized
-			model = agentConfig.Models["moderate"]
-		}
 
 		// Find source TODO item (if any)
 		sourceTodoItem := ""
@@ -390,7 +376,6 @@ func parseTasksFromJSON(output string, cfg *config.Config, todos []TodoItem) ([]
 			Wave:               wave,
 			Status:             "pending",
 			Complexity:         tj.Complexity,
-			Model:              model,
 			Description:        tj.Description,
 			AcceptanceCriteria: tj.AcceptanceCriteria,
 			BlockedBy:          tj.BlockedBy,
@@ -435,7 +420,6 @@ func confirmTasks(tasks []*storage.Task) bool {
 	for _, task := range tasks {
 		fmt.Printf("\n[%s] %s\n", task.ID, task.Title)
 		fmt.Printf("  Complexity: %s\n", task.Complexity)
-		fmt.Printf("  Model: %s\n", task.Model)
 		fmt.Printf("  Description: %s\n", task.Description)
 		if len(task.AcceptanceCriteria) > 0 {
 			fmt.Println("  Acceptance Criteria:")

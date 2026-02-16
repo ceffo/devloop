@@ -90,7 +90,6 @@ func TestExecuteTaskSuccess(t *testing.T) {
 		Title:       "Test Task",
 		Status:      "pending",
 		Complexity:  "simple",
-		Model:       "test-model",
 		Description: "Test description",
 		Metadata: storage.TaskMetadata{
 			CreatedAt:   time.Now(),
@@ -115,7 +114,7 @@ func TestExecuteTaskSuccess(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task)
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001")
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)
@@ -184,7 +183,6 @@ func TestExecuteTaskRetry(t *testing.T) {
 		Title:       "Test Task",
 		Status:      "pending",
 		Complexity:  "simple",
-		Model:       "test-model",
 		Description: "Test description",
 		Metadata: storage.TaskMetadata{
 			CreatedAt:   time.Now(),
@@ -209,7 +207,7 @@ func TestExecuteTaskRetry(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task)
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001")
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)
@@ -274,7 +272,6 @@ func TestExecuteTaskAgentError(t *testing.T) {
 		Title:       "Test Task",
 		Status:      "pending",
 		Complexity:  "simple",
-		Model:       "test-model",
 		Description: "Test description",
 		Metadata: storage.TaskMetadata{
 			CreatedAt:   time.Now(),
@@ -300,7 +297,7 @@ func TestExecuteTaskAgentError(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task)
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001")
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)

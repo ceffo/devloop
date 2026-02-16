@@ -12,7 +12,6 @@ type Task struct {
 	// Status and state
 	Status     string `json:"status"`     // pending, in_progress, completed, failed, blocked, archived
 	Complexity string `json:"complexity"` // simple, moderate, complex (maps to AI model)
-	Model      string `json:"model"`      // AI model to use (from complexity mapping)
 
 	// Task content
 	Description        string   `json:"description"`                   // Detailed task description

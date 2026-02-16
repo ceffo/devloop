@@ -167,7 +167,7 @@ func displayTasksSummary(tasks []*storage.Task) {
 	fmt.Println()
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("ID", "Title", "Complexity", "Model", "Dependencies")
+	table.Header("ID", "Title", "Complexity", "Dependencies")
 
 	for _, task := range tasks {
 		dependencies := "-"
@@ -179,7 +179,6 @@ func displayTasksSummary(tasks []*storage.Task) {
 			task.ID,
 			truncateString(task.Title, 40),
 			task.Complexity,
-			task.Model,
 			dependencies,
 		)
 	}

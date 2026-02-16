@@ -403,9 +403,6 @@ func TestParseTasksFromJSON(t *testing.T) {
 				if task.Complexity != "simple" {
 					t.Errorf("Complexity = %q, want %q", task.Complexity, "simple")
 				}
-				if task.Model != "model-simple" {
-					t.Errorf("Model = %q, want %q", task.Model, "model-simple")
-				}
 				if task.Status != "pending" {
 					t.Errorf("Status = %q, want %q", task.Status, "pending")
 				}
@@ -435,9 +432,6 @@ func TestParseTasksFromJSON(t *testing.T) {
 			wantErr:   false,
 			wantCount: 1,
 			checkFirst: func(t *testing.T, task *storage.Task) {
-				if task.Model != "model-moderate" {
-					t.Errorf("Model = %q, want %q", task.Model, "model-moderate")
-				}
 				if len(task.BlockedBy) != 1 || task.BlockedBy[0] != "1.1" {
 					t.Errorf("BlockedBy = %v, want [\"1.1\"]", task.BlockedBy)
 				}

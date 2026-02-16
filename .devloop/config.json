@@ -11,11 +11,24 @@
     "timeout_seconds": 300
   },
   "cli": {
-    "tool": "copilot",
-    "models": {
-      "simple": "gpt-5-mini",
-      "moderate": "claude-sonnet-4.5",
-      "complex": "claude-opus-4.6"
+    "default_agent": "claude",
+    "agents": {
+      "claude": {
+        "tool": "claude",
+        "models": {
+          "simple": "claude-haiku-4-5-20251001",
+          "moderate": "claude-sonnet-4-5-20250929",
+          "complex": "claude-opus-4-6"
+        }
+      },
+      "copilot": {
+        "tool": "copilot",
+        "models": {
+          "simple": "claude-haiku-4.5",
+          "moderate": "claude-sonnet-4.5",
+          "complex": "claude-opus-4.6"
+        }
+      }
     }
   },
   "execution": {

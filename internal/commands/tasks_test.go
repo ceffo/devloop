@@ -73,7 +73,6 @@ func TestTasksListCommand(t *testing.T) {
 			Wave:       1,
 			Status:     "completed",
 			Complexity: "simple",
-			Model:      "claude-haiku-4-5-20251001",
 			Execution: storage.TaskExecution{
 				Attempts:      []storage.Attempt{{Duration: 30}},
 				TotalDuration: 30,
@@ -85,7 +84,6 @@ func TestTasksListCommand(t *testing.T) {
 			Wave:       1,
 			Status:     "in_progress",
 			Complexity: "moderate",
-			Model:      "claude-sonnet-4-5-20250929",
 			Execution: storage.TaskExecution{
 				Attempts:      []storage.Attempt{{Duration: 120}},
 				TotalDuration: 120,
@@ -97,7 +95,6 @@ func TestTasksListCommand(t *testing.T) {
 			Wave:       2,
 			Status:     "pending",
 			Complexity: "simple",
-			Model:      "claude-haiku-4-5-20251001",
 			Tags:       []string{"testing"},
 		},
 		{
@@ -106,7 +103,6 @@ func TestTasksListCommand(t *testing.T) {
 			Wave:       2,
 			Status:     "failed",
 			Complexity: "complex",
-			Model:      "claude-opus-4-6",
 			Execution: storage.TaskExecution{
 				Attempts:      []storage.Attempt{{Duration: 300}, {Duration: 250}},
 				TotalDuration: 550,
@@ -322,7 +318,6 @@ func TestTasksShowCommand(t *testing.T) {
 		Wave:        1,
 		Status:      "completed",
 		Complexity:  "simple",
-		Model:       "claude-haiku-4-5-20251001",
 		Description: "Initialize project with proper directory structure and dependencies",
 		AcceptanceCriteria: []string{
 			"Directory structure created",
@@ -345,7 +340,6 @@ func TestTasksShowCommand(t *testing.T) {
 					StartedAt:     time.Now(),
 					CompletedAt:   time.Now(),
 					Duration:      45,
-					Model:         "claude-haiku-4-5-20251001",
 					Success:       true,
 					Result:        "passed",
 					LogPath:       ".devloop/logs/task-1.1-attempt-1.log",
@@ -497,7 +491,6 @@ func TestTasksUpdateCommand(t *testing.T) {
 		Wave:       1,
 		Status:     "pending",
 		Complexity: "simple",
-		Model:      "claude-haiku-4-5-20251001",
 		Metadata: storage.TaskMetadata{
 			CreatedAt:   now,
 			UpdatedAt:   now,

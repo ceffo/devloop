@@ -40,6 +40,21 @@ type AgentConfig struct {
 	Models map[string]string `json:"models"`
 }
 
+// GetModel returns the model name for the given complexity level
+// Returns an error if the complexity level is not found
+func (a *AgentConfig) GetModel(complexity string) (string, error) {
+	model, exists := a.Models[complexity]
+	if !exists {
+		available := make([]string, 0, len(a.Models))
+		for k := range a.Models {
+			available = append(available, k)
+		}
+		sort.Strings(available)
+		return "", fmt.Errorf("complexity %q not found in agent models (available: %v)", complexity, available)
+	}
+	return model, nil
+}
+
 // CLIConfig specifies which AI CLI tool and models to use
 // Supports multiple agents with optional default agent selection
 type CLIConfig struct {

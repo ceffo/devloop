@@ -254,7 +254,6 @@ func displayTaskDetails(task *storage.Task) {
 	fmt.Printf("  Wave:         %d\n", task.Wave)
 	fmt.Printf("  Status:       %s\n", formatStatus(task.Status))
 	fmt.Printf("  Complexity:   %s\n", task.Complexity)
-	fmt.Printf("  Model:        %s\n", task.Model)
 	fmt.Printf("  Created:      %s\n", task.Metadata.CreatedAt.Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Updated:      %s\n", task.Metadata.UpdatedAt.Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Max Attempts: %d\n", task.Metadata.MaxAttempts)

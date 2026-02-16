@@ -52,7 +52,6 @@ func createSampleTask(id, title, status string) *Task {
 		Wave:        1,
 		Status:      status,
 		Complexity:  "simple",
-		Model:       "claude-haiku-4-5-20251001",
 		Description: "Test task description",
 		AcceptanceCriteria: []string{
 			"Criterion 1",
