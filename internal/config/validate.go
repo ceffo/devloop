@@ -54,11 +54,46 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("verification.timeout_seconds must be greater than 0, got: %d", c.Verification.TimeoutSeconds)
 	}
 
-	// Check model names are valid
-	for complexity, model := range c.CLI.Models {
-		if !knownModels[model] {
-			return fmt.Errorf("cli.models.%s has invalid model name: %s (valid models: claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929, claude-opus-4-6)", complexity, model)
+	// Validate agents configuration
+	if len(c.CLI.Agents) > 0 {
+		// New format: agents map
+		if c.CLI.DefaultAgent != "" {
+			// Check if default agent exists
+			if _, exists := c.CLI.Agents[c.CLI.DefaultAgent]; !exists {
+				return fmt.Errorf("cli.default_agent references non-existent agent: %s", c.CLI.DefaultAgent)
+			}
 		}
+
+		// Validate each agent
+		for agentName, agent := range c.CLI.Agents {
+			// Check tool is valid
+			if agent.Tool != "claude" && agent.Tool != "copilot" {
+				return fmt.Errorf("cli.agents.%s.tool must be 'claude' or 'copilot', got: %s", agentName, agent.Tool)
+			}
+
+			// Check models is not empty
+			if len(agent.Models) == 0 {
+				return fmt.Errorf("cli.agents.%s.models cannot be empty", agentName)
+			}
+
+			// Check model names are valid
+			for complexity, model := range agent.Models {
+				if !knownModels[model] {
+					return fmt.Errorf("cli.agents.%s.models.%s has invalid model name: %s", agentName, complexity, model)
+				}
+			}
+		}
+	} else if c.CLI.Tool != "" {
+		// Old format: top-level tool and models (for backwards compatibility)
+		// Check model names are valid
+		for complexity, model := range c.CLI.Models {
+			if !knownModels[model] {
+				return fmt.Errorf("cli.models.%s has invalid model name: %s", complexity, model)
+			}
+		}
+	} else {
+		// No agents and no tool configured
+		return errors.New("cli must have either 'agents' (new format) or 'tool' with 'models' (old format)")
 	}
 
 	// Check max_attempts > 0

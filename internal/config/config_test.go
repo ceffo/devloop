@@ -264,3 +264,300 @@ func TestConfigMarshaling(t *testing.T) {
 		t.Errorf("Expected project path '%s', got '%s'", cfg.Project.Path, cfg2.Project.Path)
 	}
 }
+
+// Tests for multi-agent support
+
+func TestGetAgent_DefaultAgent(t *testing.T) {
+	cfg := getDefaultConfig()
+
+	agent, err := cfg.CLI.GetAgent("")
+	if err != nil {
+		t.Fatalf("GetAgent() should succeed for default: %v", err)
+	}
+
+	if agent == nil {
+		t.Fatal("GetAgent() should return non-nil agent")
+	}
+
+	if agent.Tool != "claude" {
+		t.Errorf("Expected tool 'claude', got '%s'", agent.Tool)
+	}
+}
+
+func TestGetAgent_SpecificAgent(t *testing.T) {
+	cfg := getDefaultConfig()
+
+	agent, err := cfg.CLI.GetAgent("claude")
+	if err != nil {
+		t.Fatalf("GetAgent('claude') should succeed: %v", err)
+	}
+
+	if agent.Tool != "claude" {
+		t.Errorf("Expected tool 'claude', got '%s'", agent.Tool)
+	}
+}
+
+func TestGetAgent_InvalidAgent(t *testing.T) {
+	cfg := getDefaultConfig()
+
+	_, err := cfg.CLI.GetAgent("nonexistent")
+	if err == nil {
+		t.Error("GetAgent('nonexistent') should fail")
+	}
+
+	if !contains(err.Error(), "nonexistent") {
+		t.Errorf("Error should mention agent name: %v", err)
+	}
+}
+
+func TestGetAgent_MultipleAgents(t *testing.T) {
+	cfg := &Config{
+		CLI: CLIConfig{
+			DefaultAgent: "claude",
+			Agents: map[string]*AgentConfig{
+				"claude": {
+					Tool:   "claude",
+					Models: map[string]string{"simple": "claude-haiku-4-5-20251001"},
+				},
+				"copilot": {
+					Tool:   "copilot",
+					Models: map[string]string{"simple": "gpt-4"},
+				},
+			},
+		},
+	}
+
+	agentA, errA := cfg.CLI.GetAgent("claude")
+	agentB, errB := cfg.CLI.GetAgent("copilot")
+
+	if errA != nil || errB != nil {
+		t.Fatalf("GetAgent should succeed for both agents")
+	}
+
+	if agentA.Tool != "claude" || agentB.Tool != "copilot" {
+		t.Error("Agents should have correct tools")
+	}
+}
+
+func TestGetDefaultAgentName_Explicit(t *testing.T) {
+	cfg := &Config{
+		CLI: CLIConfig{
+			DefaultAgent: "copilot",
+			Agents: map[string]*AgentConfig{
+				"claude":  {Tool: "claude"},
+				"copilot": {Tool: "copilot"},
+			},
+		},
+	}
+
+	name := cfg.CLI.GetDefaultAgentName()
+	if name != "copilot" {
+		t.Errorf("Expected 'copilot', got '%s'", name)
+	}
+}
+
+func TestGetDefaultAgentName_Alphabetical(t *testing.T) {
+	cfg := &Config{
+		CLI: CLIConfig{
+			// DefaultAgent not set, should use alphabetical
+			Agents: map[string]*AgentConfig{
+				"zulu":   {Tool: "claude"},
+				"alpha":  {Tool: "copilot"},
+				"bravo":  {Tool: "claude"},
+			},
+		},
+	}
+
+	name := cfg.CLI.GetDefaultAgentName()
+	if name != "alpha" {
+		t.Errorf("Expected 'alpha' (first alphabetically), got '%s'", name)
+	}
+}
+
+func TestMigrateOldFormat(t *testing.T) {
+	cli := CLIConfig{
+		Tool: "claude",
+		Models: map[string]string{
+			"simple":   "claude-haiku-4-5-20251001",
+			"moderate": "claude-sonnet-4-5-20250929",
+			"complex":  "claude-opus-4-6",
+		},
+	}
+
+	migrated := cli.migrateOldFormat()
+	if !migrated {
+		t.Error("migrateOldFormat should return true for old format")
+	}
+
+	if cli.DefaultAgent != "default" {
+		t.Errorf("Expected default_agent 'default', got '%s'", cli.DefaultAgent)
+	}
+
+	if agent, exists := cli.Agents["default"]; !exists || agent.Tool != "claude" {
+		t.Error("Migration should create 'default' agent with old settings")
+	}
+}
+
+func TestMigrateOldFormat_AlreadyNew(t *testing.T) {
+	cli := CLIConfig{
+		DefaultAgent: "claude",
+		Agents: map[string]*AgentConfig{
+			"claude": {Tool: "claude", Models: map[string]string{"simple": "claude-haiku-4-5-20251001"}},
+		},
+	}
+
+	migrated := cli.migrateOldFormat()
+	if migrated {
+		t.Error("migrateOldFormat should return false for already new format")
+	}
+}
+
+func TestLoadOldFormatConfig(t *testing.T) {
+	// Create temp directory
+	tempDir, err := os.MkdirTemp("", "devloop-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	configPath := filepath.Join(tempDir, "config.json")
+
+	// Create old format config
+	oldConfigJSON := `{
+		"version": "1.0",
+		"project": {
+			"name": "test",
+			"path": "/tmp",
+			"tech_stack": "Go",
+			"main_branch": "main"
+		},
+		"verification": {
+			"command": "go test",
+			"timeout_seconds": 300
+		},
+		"cli": {
+			"tool": "claude",
+			"models": {
+				"simple": "claude-haiku-4-5-20251001",
+				"moderate": "claude-sonnet-4-5-20250929",
+				"complex": "claude-opus-4-6"
+			}
+		},
+		"execution": {
+			"max_attempts": 2,
+			"halt_on_failure": true,
+			"auto_commit": true
+		}
+	}`
+
+	if err := os.WriteFile(configPath, []byte(oldConfigJSON), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	// Load and verify migration
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	// Should have migrated to new format
+	if cfg.CLI.DefaultAgent != "default" {
+		t.Errorf("Expected migrated default_agent 'default', got '%s'", cfg.CLI.DefaultAgent)
+	}
+
+	// Should still be able to get agent
+	agent, err := cfg.CLI.GetAgent("")
+	if err != nil {
+		t.Fatalf("GetAgent() after migration failed: %v", err)
+	}
+
+	if agent.Tool != "claude" {
+		t.Errorf("Expected migrated agent tool 'claude', got '%s'", agent.Tool)
+	}
+}
+
+func TestLoadNewFormatConfig(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "devloop-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	configPath := filepath.Join(tempDir, "config.json")
+
+	// Create new format config with multiple agents
+	newConfigJSON := `{
+		"version": "1.0",
+		"project": {
+			"name": "test",
+			"path": "/tmp",
+			"tech_stack": "Go",
+			"main_branch": "main"
+		},
+		"verification": {
+			"command": "go test",
+			"timeout_seconds": 300
+		},
+		"cli": {
+			"default_agent": "claude",
+			"agents": {
+				"claude": {
+					"tool": "claude",
+					"models": {
+						"simple": "claude-haiku-4-5-20251001",
+						"moderate": "claude-sonnet-4-5-20250929",
+						"complex": "claude-opus-4-6"
+					}
+				},
+				"copilot": {
+					"tool": "copilot",
+					"models": {
+						"simple": "gpt-4o-mini",
+						"moderate": "gpt-4o",
+						"complex": "o1-pro"
+					}
+				}
+			}
+		},
+		"execution": {
+			"max_attempts": 2,
+			"halt_on_failure": true,
+			"auto_commit": true
+		}
+	}`
+
+	if err := os.WriteFile(configPath, []byte(newConfigJSON), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	// Load and verify
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	// Should have both agents
+	claudeAgent, err := cfg.CLI.GetAgent("claude")
+	if err != nil {
+		t.Fatalf("GetAgent('claude') failed: %v", err)
+	}
+
+	copilotAgent, err := cfg.CLI.GetAgent("copilot")
+	if err != nil {
+		t.Fatalf("GetAgent('copilot') failed: %v", err)
+	}
+
+	if claudeAgent.Tool != "claude" || copilotAgent.Tool != "copilot" {
+		t.Error("Both agents should be loaded correctly")
+	}
+
+	// Default should be claude
+	if cfg.CLI.GetDefaultAgentName() != "claude" {
+		t.Errorf("Expected default agent 'claude', got '%s'", cfg.CLI.GetDefaultAgentName())
+	}
+}
+
+// Helper function
+func contains(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) > len(substr) && s[0:len(substr)] == substr || len(s) > 0)
+}

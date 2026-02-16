@@ -231,15 +231,22 @@ func ProcessTodoItems(cfg *config.Config, todos []TodoItem, review bool) ([]*sto
 		return nil, fmt.Errorf("failed to render TODO prompt: %w", err)
 	}
 
+	// Get default agent config
+	defaultAgentName := cfg.CLI.GetDefaultAgentName()
+	agentConfig, err := cfg.CLI.GetAgent(defaultAgentName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get default agent configuration: %w", err)
+	}
+
 	// Create agent runner
-	agentRunner, err := agent.NewAgentRunner(cfg.CLI.Tool)
+	agentRunner, err := agent.NewAgentRunner(agentConfig.Tool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create agent runner: %w", err)
 	}
 
 	// Execute Opus model (complex reasoning needed)
 	logPath := filepath.Join(cfg.Project.Path, ".devloop", "logs", fmt.Sprintf("todo-processing-%d.log", time.Now().Unix()))
-	model := cfg.CLI.Models["complex"] // Use Opus for complex reasoning
+	model := agentConfig.Models["complex"] // Use Opus for complex reasoning
 	result, err := agentRunner.Run(model, prompt, logPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run AI agent: %w", err)
@@ -348,6 +355,13 @@ func parseTasksFromJSON(output string, cfg *config.Config, todos []TodoItem) ([]
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
+	// Get default agent config for model mapping
+	defaultAgentName := cfg.CLI.GetDefaultAgentName()
+	agentConfig, err := cfg.CLI.GetAgent(defaultAgentName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get default agent configuration: %w", err)
+	}
+
 	// Convert to Task structs
 	var tasks []*storage.Task
 	now := time.Now()
@@ -357,10 +371,10 @@ func parseTasksFromJSON(output string, cfg *config.Config, todos []TodoItem) ([]
 		wave := extractWaveFromID(tj.ID)
 
 		// Assign model based on complexity
-		model := cfg.CLI.Models[tj.Complexity]
+		model := agentConfig.Models[tj.Complexity]
 		if model == "" {
 			// Default to moderate if complexity not recognized
-			model = cfg.CLI.Models["moderate"]
+			model = agentConfig.Models["moderate"]
 		}
 
 		// Find source TODO item (if any)

@@ -26,7 +26,8 @@ import (
 //   - taskID: Filter by specific task ID (empty = all tasks)
 //   - continueSession: Whether to resume from last checkpoint
 //   - dryRun: If true, only show what would be executed without running
-func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession bool, dryRun bool) error {
+//   - agentName: Name of agent to use (empty = default agent)
+func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession bool, dryRun bool, agentName string) error {
 	// Setup signal handling for graceful interrupts
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -120,10 +121,22 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		return nil
 	}
 
+	// Get agent config
+	agentConfig, err := cfg.CLI.GetAgent(agentName)
+	if err != nil {
+		return fmt.Errorf("failed to get agent configuration: %w", err)
+	}
+
 	// Initialize agent runner
-	agentRunner, err := agent.NewAgentRunner(cfg.CLI.Tool)
+	agentRunner, err := agent.NewAgentRunner(agentConfig.Tool)
 	if err != nil {
 		return fmt.Errorf("failed to create agent runner: %w", err)
+	}
+
+	// Display which agent is being used
+	selectedAgentName := cfg.CLI.GetDefaultAgentName()
+	if agentName != "" {
+		selectedAgentName = agentName
 	}
 
 	// Execute tasks
@@ -141,7 +154,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 
 		fmt.Printf("═══════════════════════════════════════════════════════════\n")
 		fmt.Printf("Task %d/%d: %s - %s\n", i+1, len(tasks), task.ID, task.Title)
-		fmt.Printf("Complexity: %s | Model: %s\n", task.Complexity, task.Model)
+		fmt.Printf("Complexity: %s | Model: %s | Agent: %s\n", task.Complexity, task.Model, selectedAgentName)
 		fmt.Printf("═══════════════════════════════════════════════════════════\n\n")
 
 		// Execute task with retries

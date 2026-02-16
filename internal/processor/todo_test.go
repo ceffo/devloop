@@ -350,10 +350,16 @@ func TestGenerateNextTaskID(t *testing.T) {
 func TestParseTasksFromJSON(t *testing.T) {
 	cfg := &config.Config{
 		CLI: config.CLIConfig{
-			Models: map[string]string{
-				"simple":   "model-simple",
-				"moderate": "model-moderate",
-				"complex":  "model-complex",
+			DefaultAgent: "test",
+			Agents: map[string]*config.AgentConfig{
+				"test": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple":   "model-simple",
+						"moderate": "model-moderate",
+						"complex":  "model-complex",
+					},
+				},
 			},
 		},
 		Execution: config.ExecutionConfig{

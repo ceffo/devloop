@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 // Config represents the complete devloop configuration
@@ -33,10 +34,22 @@ type VerificationConfig struct {
 	TimeoutSeconds int    `json:"timeout_seconds"`
 }
 
-// CLIConfig specifies which AI CLI tool and models to use
-type CLIConfig struct {
+// AgentConfig defines a single agentic CLI with its tool and models
+type AgentConfig struct {
 	Tool   string            `json:"tool"`
 	Models map[string]string `json:"models"`
+}
+
+// CLIConfig specifies which AI CLI tool and models to use
+// Supports multiple agents with optional default agent selection
+type CLIConfig struct {
+	DefaultAgent string                  `json:"default_agent,omitempty"`
+	Agents       map[string]*AgentConfig `json:"agents,omitempty"`
+
+	// Deprecated fields for backwards compatibility
+	// These are converted to the agents map on load
+	Tool   string            `json:"tool,omitempty"`
+	Models map[string]string `json:"models,omitempty"`
 }
 
 // ExecutionConfig controls task execution behavior
@@ -64,6 +77,101 @@ type PromptsConfig struct {
 	CustomInstructions string `json:"custom_instructions,omitempty"`
 }
 
+// GetAgent returns the AgentConfig for the given agent name
+// If the agent doesn't exist, returns an error with helpful message listing available agents
+func (c *CLIConfig) GetAgent(name string) (*AgentConfig, error) {
+	// If using legacy format (agents map is empty), create a default agent from old fields
+	if len(c.Agents) == 0 && c.Tool != "" {
+		return &AgentConfig{
+			Tool:   c.Tool,
+			Models: c.Models,
+		}, nil
+	}
+
+	// If requesting specific agent, return it
+	if name != "" {
+		if agent, exists := c.Agents[name]; exists {
+			return agent, nil
+		}
+		// Agent not found - list available ones
+		available := make([]string, 0, len(c.Agents))
+		for agentName := range c.Agents {
+			available = append(available, agentName)
+		}
+		sort.Strings(available)
+		return nil, fmt.Errorf("agent %q not found (available: %v)", name, available)
+	}
+
+	// If no name requested, return default agent
+	if c.DefaultAgent != "" {
+		if agent, exists := c.Agents[c.DefaultAgent]; exists {
+			return agent, nil
+		}
+		return nil, fmt.Errorf("default agent %q not found", c.DefaultAgent)
+	}
+
+	// No default agent specified, use first alphabetically
+	if len(c.Agents) > 0 {
+		available := make([]string, 0, len(c.Agents))
+		for agentName := range c.Agents {
+			available = append(available, agentName)
+		}
+		sort.Strings(available)
+		return c.Agents[available[0]], nil
+	}
+
+	return nil, fmt.Errorf("no agents configured")
+}
+
+// GetDefaultAgentName returns the effective default agent name
+// If default_agent is set, returns it. Otherwise returns first agent alphabetically.
+func (c *CLIConfig) GetDefaultAgentName() string {
+	// If default is explicitly set, use it
+	if c.DefaultAgent != "" {
+		return c.DefaultAgent
+	}
+
+	// Return first alphabetically
+	if len(c.Agents) > 0 {
+		available := make([]string, 0, len(c.Agents))
+		for agentName := range c.Agents {
+			available = append(available, agentName)
+		}
+		sort.Strings(available)
+		return available[0]
+	}
+
+	return ""
+}
+
+// migrateOldFormat converts old config format (with top-level tool/models) to new format (with agents map)
+// Returns true if migration was performed
+func (c *CLIConfig) migrateOldFormat() bool {
+	// If already in new format (agents map exists), no migration needed
+	if len(c.Agents) > 0 {
+		return false
+	}
+
+	// If old format fields are empty, nothing to migrate
+	if c.Tool == "" {
+		return false
+	}
+
+	// Migrate old format to new format
+	c.Agents = map[string]*AgentConfig{
+		"default": {
+			Tool:   c.Tool,
+			Models: c.Models,
+		},
+	}
+	c.DefaultAgent = "default"
+
+	// Keep old fields for backwards compatibility on save
+	// They'll be preserved as-is in JSON
+
+	return true
+}
+
 // LoadConfig loads configuration from a JSON file
 // Returns a Config with sensible defaults if the file doesn't exist
 func LoadConfig(path string) (*Config, error) {
@@ -84,6 +192,9 @@ func LoadConfig(path string) (*Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config JSON: %w", err)
 	}
+
+	// Migrate old format to new format if needed
+	cfg.CLI.migrateOldFormat()
 
 	// Apply defaults for missing fields
 	applyDefaults(&cfg)
@@ -128,6 +239,18 @@ func getDefaultConfig() *Config {
 			TimeoutSeconds: 300,
 		},
 		CLI: CLIConfig{
+			DefaultAgent: "claude",
+			Agents: map[string]*AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple":   "claude-haiku-4-5-20251001",
+						"moderate": "claude-sonnet-4-5-20250929",
+						"complex":  "claude-opus-4-6",
+					},
+				},
+			},
+			// Keep legacy fields for backwards compatibility
 			Tool: "claude",
 			Models: map[string]string{
 				"simple":   "claude-haiku-4-5-20251001",
@@ -171,10 +294,18 @@ func applyDefaults(cfg *Config) {
 		cfg.Verification.TimeoutSeconds = defaults.Verification.TimeoutSeconds
 	}
 
+	// Apply CLI defaults
+	if len(cfg.CLI.Agents) == 0 {
+		cfg.CLI.Agents = defaults.CLI.Agents
+	}
+	if cfg.CLI.DefaultAgent == "" {
+		cfg.CLI.DefaultAgent = defaults.CLI.DefaultAgent
+	}
+
+	// Also set legacy fields for backwards compatibility
 	if cfg.CLI.Tool == "" {
 		cfg.CLI.Tool = defaults.CLI.Tool
 	}
-
 	if cfg.CLI.Models == nil {
 		cfg.CLI.Models = defaults.CLI.Models
 	}

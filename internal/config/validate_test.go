@@ -133,7 +133,8 @@ func TestValidate_InvalidModelName(t *testing.T) {
 	cfg := getDefaultConfig()
 	cfg.Project.Path = tmpDir
 	cfg.Verification.Command = "go test"
-	cfg.CLI.Models = map[string]string{
+	// Update the models in the default agent
+	cfg.CLI.Agents["claude"].Models = map[string]string{
 		"simple":   "invalid-model-name",
 		"moderate": "claude-sonnet-4-5-20250929",
 		"complex":  "claude-opus-4-6",
@@ -191,7 +192,8 @@ func TestValidate_AllModelsInvalid(t *testing.T) {
 	cfg := getDefaultConfig()
 	cfg.Project.Path = tmpDir
 	cfg.Verification.Command = "go test"
-	cfg.CLI.Models = map[string]string{
+	// Update the models in the default agent
+	cfg.CLI.Agents["claude"].Models = map[string]string{
 		"simple":   "gpt-4",
 		"moderate": "gpt-3.5-turbo",
 		"complex":  "gemini-pro",
@@ -250,11 +252,16 @@ func TestValidate_RealProjectDirectory(t *testing.T) {
 			TimeoutSeconds: 600,
 		},
 		CLI: CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple":   "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex":  "claude-opus-4-6",
+			DefaultAgent: "claude",
+			Agents: map[string]*AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple":   "claude-haiku-4-5-20251001",
+						"moderate": "claude-sonnet-4-5-20250929",
+						"complex":  "claude-opus-4-6",
+					},
+				},
 			},
 		},
 		Execution: ExecutionConfig{
@@ -265,5 +272,201 @@ func TestValidate_RealProjectDirectory(t *testing.T) {
 	err = cfg.Validate()
 	if err != nil {
 		t.Errorf("Validate() failed for config with real project directory: %v", err)
+	}
+}
+
+// Tests for multi-agent validation
+
+func TestValidate_MultipleAgentsValid(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &Config{
+		Project: ProjectConfig{
+			Name: "test",
+			Path: tmpDir,
+		},
+		Verification: VerificationConfig{
+			Command:        "go test",
+			TimeoutSeconds: 300,
+		},
+		CLI: CLIConfig{
+			DefaultAgent: "claude",
+			Agents: map[string]*AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple":   "claude-haiku-4-5-20251001",
+						"moderate": "claude-sonnet-4-5-20250929",
+						"complex":  "claude-opus-4-6",
+					},
+				},
+				"copilot": {
+					Tool: "copilot",
+					Models: map[string]string{
+						"simple":   "gpt-5-mini",
+						"moderate": "gpt-5.1",
+						"complex":  "gpt-5.2",
+					},
+				},
+			},
+		},
+		Execution: ExecutionConfig{
+			MaxAttempts: 2,
+		},
+	}
+
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("Validate() should succeed for valid multi-agent config: %v", err)
+	}
+}
+
+func TestValidate_InvalidAgentTool(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &Config{
+		Project: ProjectConfig{
+			Name: "test",
+			Path: tmpDir,
+		},
+		Verification: VerificationConfig{
+			Command:        "go test",
+			TimeoutSeconds: 300,
+		},
+		CLI: CLIConfig{
+			DefaultAgent: "invalid-agent",
+			Agents: map[string]*AgentConfig{
+				"invalid-agent": {
+					Tool: "invalid-tool",
+					Models: map[string]string{
+						"simple": "claude-haiku-4-5-20251001",
+					},
+				},
+			},
+		},
+		Execution: ExecutionConfig{
+			MaxAttempts: 2,
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() should fail for invalid agent tool")
+	}
+
+	if !strings.Contains(err.Error(), "tool must be 'claude' or 'copilot'") {
+		t.Errorf("Expected error about invalid tool, got: %v", err)
+	}
+}
+
+func TestValidate_DefaultAgentNotExists(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &Config{
+		Project: ProjectConfig{
+			Name: "test",
+			Path: tmpDir,
+		},
+		Verification: VerificationConfig{
+			Command:        "go test",
+			TimeoutSeconds: 300,
+		},
+		CLI: CLIConfig{
+			DefaultAgent: "nonexistent",
+			Agents: map[string]*AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple": "claude-haiku-4-5-20251001",
+					},
+				},
+			},
+		},
+		Execution: ExecutionConfig{
+			MaxAttempts: 2,
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() should fail when default_agent doesn't exist")
+	}
+
+	if !strings.Contains(err.Error(), "default_agent references non-existent agent") {
+		t.Errorf("Expected error about missing default_agent, got: %v", err)
+	}
+}
+
+func TestValidate_AgentEmptyModels(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &Config{
+		Project: ProjectConfig{
+			Name: "test",
+			Path: tmpDir,
+		},
+		Verification: VerificationConfig{
+			Command:        "go test",
+			TimeoutSeconds: 300,
+		},
+		CLI: CLIConfig{
+			DefaultAgent: "claude",
+			Agents: map[string]*AgentConfig{
+				"claude": {
+					Tool:   "claude",
+					Models: map[string]string{}, // Empty models
+				},
+			},
+		},
+		Execution: ExecutionConfig{
+			MaxAttempts: 2,
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() should fail when agent has empty models")
+	}
+
+	if !strings.Contains(err.Error(), "models cannot be empty") {
+		t.Errorf("Expected error about empty models, got: %v", err)
+	}
+}
+
+func TestValidate_InvalidModelInAgent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &Config{
+		Project: ProjectConfig{
+			Name: "test",
+			Path: tmpDir,
+		},
+		Verification: VerificationConfig{
+			Command:        "go test",
+			TimeoutSeconds: 300,
+		},
+		CLI: CLIConfig{
+			DefaultAgent: "claude",
+			Agents: map[string]*AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple": "invalid-model-name",
+					},
+				},
+			},
+		},
+		Execution: ExecutionConfig{
+			MaxAttempts: 2,
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() should fail for invalid model in agent")
+	}
+
+	if !strings.Contains(err.Error(), "invalid model name") {
+		t.Errorf("Expected error about invalid model, got: %v", err)
 	}
 }
