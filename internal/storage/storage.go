@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/yourusername/devloop/internal/config"
 )
@@ -178,4 +179,28 @@ func (s *Storage) GetTask(id string) (*Task, error) {
 	}
 
 	return nil, fmt.Errorf("task with ID %s not found", id)
+}
+
+// QueryTasks filters tasks based on the provided filter criteria and returns them sorted by ID
+func (s *Storage) QueryTasks(filter Filter) ([]*Task, error) {
+	// Load all tasks
+	tasks, err := s.LoadTasks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tasks: %w", err)
+	}
+
+	// Filter tasks
+	var filtered []*Task
+	for _, task := range tasks {
+		if task.matchesFilter(filter) {
+			filtered = append(filtered, task)
+		}
+	}
+
+	// Sort by ID (ascending)
+	sort.Slice(filtered, func(i, j int) bool {
+		return compareTaskIDs(filtered[i].ID, filtered[j].ID)
+	})
+
+	return filtered, nil
 }

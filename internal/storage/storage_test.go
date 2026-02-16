@@ -345,3 +345,360 @@ func TestSaveTask_CreatesDirectory(t *testing.T) {
 		t.Errorf("Expected directory permissions %v, got %v", expectedMode, info.Mode().Perm())
 	}
 }
+
+func TestQueryTasks_NoFilter(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	storage := NewStorage(cfg)
+
+	// Create and save tasks
+	tasks := []*Task{
+		createSampleTask("1.1", "Task One", "pending"),
+		createSampleTask("2.3", "Task Two", "completed"),
+		createSampleTask("1.2", "Task Three", "in_progress"),
+	}
+
+	for _, task := range tasks {
+		storage.SaveTask(task)
+	}
+
+	// Query all tasks
+	results, err := storage.QueryTasks(Filter{})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(results) != 3 {
+		t.Errorf("Expected 3 tasks, got %d", len(results))
+	}
+
+	// Verify sorting by ID (1.1, 1.2, 2.3)
+	expectedOrder := []string{"1.1", "1.2", "2.3"}
+	for i, task := range results {
+		if task.ID != expectedOrder[i] {
+			t.Errorf("Task %d: expected ID %s, got %s", i, expectedOrder[i], task.ID)
+		}
+	}
+}
+
+func TestQueryTasks_FilterByStatus(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	storage := NewStorage(cfg)
+
+	// Create tasks with different statuses
+	tasks := []*Task{
+		createSampleTask("1.1", "Task One", "pending"),
+		createSampleTask("1.2", "Task Two", "completed"),
+		createSampleTask("1.3", "Task Three", "pending"),
+		createSampleTask("1.4", "Task Four", "in_progress"),
+	}
+
+	for _, task := range tasks {
+		storage.SaveTask(task)
+	}
+
+	// Query pending tasks
+	results, err := storage.QueryTasks(Filter{Status: "pending"})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 pending tasks, got %d", len(results))
+	}
+
+	for _, task := range results {
+		if task.Status != "pending" {
+			t.Errorf("Expected status 'pending', got %s", task.Status)
+		}
+	}
+}
+
+func TestQueryTasks_FilterByWave(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	storage := NewStorage(cfg)
+
+	// Create tasks in different waves
+	task1 := createSampleTask("1.1", "Task One", "pending")
+	task1.Wave = 1
+
+	task2 := createSampleTask("2.1", "Task Two", "pending")
+	task2.Wave = 2
+
+	task3 := createSampleTask("1.2", "Task Three", "pending")
+	task3.Wave = 1
+
+	storage.SaveTask(task1)
+	storage.SaveTask(task2)
+	storage.SaveTask(task3)
+
+	// Query wave 1 tasks
+	results, err := storage.QueryTasks(Filter{Wave: 1})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 wave 1 tasks, got %d", len(results))
+	}
+
+	for _, task := range results {
+		if task.Wave != 1 {
+			t.Errorf("Expected wave 1, got %d", task.Wave)
+		}
+	}
+}
+
+func TestQueryTasks_FilterByComplexity(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	storage := NewStorage(cfg)
+
+	// Create tasks with different complexities
+	task1 := createSampleTask("1.1", "Task One", "pending")
+	task1.Complexity = "simple"
+
+	task2 := createSampleTask("1.2", "Task Two", "pending")
+	task2.Complexity = "complex"
+
+	task3 := createSampleTask("1.3", "Task Three", "pending")
+	task3.Complexity = "simple"
+
+	storage.SaveTask(task1)
+	storage.SaveTask(task2)
+	storage.SaveTask(task3)
+
+	// Query simple complexity tasks
+	results, err := storage.QueryTasks(Filter{Complexity: "simple"})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 simple tasks, got %d", len(results))
+	}
+
+	for _, task := range results {
+		if task.Complexity != "simple" {
+			t.Errorf("Expected complexity 'simple', got %s", task.Complexity)
+		}
+	}
+}
+
+func TestQueryTasks_FilterByTags(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	storage := NewStorage(cfg)
+
+	// Create tasks with different tags
+	task1 := createSampleTask("1.1", "Task One", "pending")
+	task1.Tags = []string{"backend", "api"}
+
+	task2 := createSampleTask("1.2", "Task Two", "pending")
+	task2.Tags = []string{"frontend", "ui"}
+
+	task3 := createSampleTask("1.3", "Task Three", "pending")
+	task3.Tags = []string{"backend", "database"}
+
+	task4 := createSampleTask("1.4", "Task Four", "pending")
+	task4.Tags = []string{"docs"}
+
+	storage.SaveTask(task1)
+	storage.SaveTask(task2)
+	storage.SaveTask(task3)
+	storage.SaveTask(task4)
+
+	// Query tasks with "backend" tag (OR match)
+	results, err := storage.QueryTasks(Filter{Tags: []string{"backend"}})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 backend tasks, got %d", len(results))
+	}
+
+	// Query tasks with "backend" OR "ui" tags
+	results, err = storage.QueryTasks(Filter{Tags: []string{"backend", "ui"}})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(results) != 3 {
+		t.Errorf("Expected 3 tasks (backend OR ui), got %d", len(results))
+	}
+}
+
+func TestQueryTasks_FilterUnblocked(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	storage := NewStorage(cfg)
+
+	// Create tasks with different blocked states
+	task1 := createSampleTask("1.1", "Task One", "pending")
+	task1.BlockedBy = []string{}
+
+	task2 := createSampleTask("1.2", "Task Two", "pending")
+	task2.BlockedBy = []string{"1.1"}
+
+	task3 := createSampleTask("1.3", "Task Three", "pending")
+	task3.BlockedBy = []string{}
+
+	task4 := createSampleTask("1.4", "Task Four", "pending")
+	task4.BlockedBy = []string{"1.1", "1.2"}
+
+	storage.SaveTask(task1)
+	storage.SaveTask(task2)
+	storage.SaveTask(task3)
+	storage.SaveTask(task4)
+
+	// Query unblocked tasks (empty BlockedBy slice in filter)
+	results, err := storage.QueryTasks(Filter{BlockedBy: []string{}})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 unblocked tasks, got %d", len(results))
+	}
+
+	for _, task := range results {
+		if len(task.BlockedBy) > 0 {
+			t.Errorf("Expected unblocked task, got task blocked by %v", task.BlockedBy)
+		}
+	}
+}
+
+func TestQueryTasks_FilterByBlockedBy(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	storage := NewStorage(cfg)
+
+	// Create tasks with different blocked states
+	task1 := createSampleTask("1.1", "Task One", "pending")
+	task1.BlockedBy = []string{"1.0"}
+
+	task2 := createSampleTask("1.2", "Task Two", "pending")
+	task2.BlockedBy = []string{"1.1"}
+
+	task3 := createSampleTask("1.3", "Task Three", "pending")
+	task3.BlockedBy = []string{"1.1", "1.2"}
+
+	task4 := createSampleTask("1.4", "Task Four", "pending")
+	task4.BlockedBy = []string{"2.0"}
+
+	storage.SaveTask(task1)
+	storage.SaveTask(task2)
+	storage.SaveTask(task3)
+	storage.SaveTask(task4)
+
+	// Query tasks blocked by "1.1"
+	results, err := storage.QueryTasks(Filter{BlockedBy: []string{"1.1"}})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 tasks blocked by 1.1, got %d", len(results))
+	}
+
+	for _, task := range results {
+		hasBlocker := false
+		for _, blocker := range task.BlockedBy {
+			if blocker == "1.1" {
+				hasBlocker = true
+				break
+			}
+		}
+		if !hasBlocker {
+			t.Errorf("Expected task blocked by 1.1, got task blocked by %v", task.BlockedBy)
+		}
+	}
+}
+
+func TestQueryTasks_CombinedFilters(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	storage := NewStorage(cfg)
+
+	// Create diverse tasks
+	task1 := createSampleTask("1.1", "Task One", "pending")
+	task1.Wave = 1
+	task1.Complexity = "simple"
+	task1.Tags = []string{"backend"}
+	task1.BlockedBy = []string{}
+
+	task2 := createSampleTask("1.2", "Task Two", "pending")
+	task2.Wave = 1
+	task2.Complexity = "complex"
+	task2.Tags = []string{"backend"}
+	task2.BlockedBy = []string{}
+
+	task3 := createSampleTask("1.3", "Task Three", "completed")
+	task3.Wave = 1
+	task3.Complexity = "simple"
+	task3.Tags = []string{"backend"}
+	task3.BlockedBy = []string{}
+
+	task4 := createSampleTask("2.1", "Task Four", "pending")
+	task4.Wave = 2
+	task4.Complexity = "simple"
+	task4.Tags = []string{"backend"}
+	task4.BlockedBy = []string{}
+
+	storage.SaveTask(task1)
+	storage.SaveTask(task2)
+	storage.SaveTask(task3)
+	storage.SaveTask(task4)
+
+	// Query: wave=1, status=pending, complexity=simple, unblocked
+	results, err := storage.QueryTasks(Filter{
+		Wave:       1,
+		Status:     "pending",
+		Complexity: "simple",
+		BlockedBy:  []string{},
+	})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Expected 1 task matching all filters, got %d", len(results))
+	}
+
+	if len(results) > 0 && results[0].ID != "1.1" {
+		t.Errorf("Expected task 1.1, got %s", results[0].ID)
+	}
+}
+
+func TestQueryTasks_IDSorting(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	storage := NewStorage(cfg)
+
+	// Create tasks in random order with hierarchical IDs
+	tasks := []*Task{
+		createSampleTask("2.3", "Task", "pending"),
+		createSampleTask("1.10", "Task", "pending"),
+		createSampleTask("1.2", "Task", "pending"),
+		createSampleTask("10.1", "Task", "pending"),
+		createSampleTask("1.1", "Task", "pending"),
+		createSampleTask("2.1", "Task", "pending"),
+	}
+
+	for _, task := range tasks {
+		storage.SaveTask(task)
+	}
+
+	// Query all tasks
+	results, err := storage.QueryTasks(Filter{})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	// Expected order: 1.1, 1.2, 1.10, 2.1, 2.3, 10.1
+	expectedOrder := []string{"1.1", "1.2", "1.10", "2.1", "2.3", "10.1"}
+
+	if len(results) != len(expectedOrder) {
+		t.Errorf("Expected %d tasks, got %d", len(expectedOrder), len(results))
+	}
+
+	for i, expected := range expectedOrder {
+		if i < len(results) && results[i].ID != expected {
+			t.Errorf("Position %d: expected ID %s, got %s", i, expected, results[i].ID)
+		}
+	}
+}
