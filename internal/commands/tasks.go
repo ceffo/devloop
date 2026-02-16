@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/ceffo/devloop/internal/config"
 	"github.com/ceffo/devloop/internal/storage"
 	"github.com/ceffo/devloop/internal/ui"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -127,27 +125,22 @@ Examples:
 
 // displayTasksTable renders tasks in a formatted table
 func displayTasksTable(tasks []*storage.Task) {
-	table := tablewriter.NewWriter(os.Stdout)
-
-	// Set header
-	table.Header("ID", "Title", "Status", "Complexity", "Attempts", "Duration")
+	table := ui.NewTable("ID", "Title", "Status", "Complexity", "Attempts", "Duration")
 
 	// Add rows
 	for _, task := range tasks {
 		table.Append(
 			task.ID,
 			truncateTitle(task.Title, 50),
-			formatStatus(task.Status),
-			task.Complexity,
+			ui.StatusBadge(task.Status),
+			ui.ComplexityBadge(task.Complexity),
 			strconv.Itoa(len(task.Execution.Attempts)),
 			formatDuration(task.Execution.TotalDuration),
 		)
 	}
 
 	// Render the table
-	if err := table.Render(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error rendering table: %v\n", err)
-	}
+	fmt.Print(table.Render())
 }
 
 // formatStatus returns a color-coded status string
@@ -303,8 +296,7 @@ func displayTaskDetails(task *storage.Task) {
 		fmt.Printf("  Attempts:       %d\n\n", len(task.Execution.Attempts))
 
 		// Display attempts table
-		table := tablewriter.NewWriter(os.Stdout)
-		table.Header("#", "Model", "Duration", "Result", "Log Path")
+		table := ui.NewTable("#", "Model", "Duration", "Result", "Log Path")
 
 		for _, attempt := range task.Execution.Attempts {
 			result := formatAttemptResult(attempt.Result, attempt.Success)
@@ -335,9 +327,7 @@ func displayTaskDetails(task *storage.Task) {
 			}
 		}
 
-		if err := table.Render(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error rendering table: %v\n", err)
-		}
+		fmt.Print(table.Render())
 	} else {
 		fmt.Println("  (no attempts yet)")
 	}
