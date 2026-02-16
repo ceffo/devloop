@@ -142,6 +142,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 	// Execute tasks
 	successCount := 0
 	failureCount := 0
+	taskProgress := ui.NewTaskProgress(len(tasks))
 
 	for i, task := range tasks {
 		// Check for interrupts
@@ -151,6 +152,8 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 			return printSummary(successCount, failureCount, session)
 		default:
 		}
+
+		taskProgress.Update(i+1, fmt.Sprintf("%s - %s", task.ID, task.Title))
 
 		fmt.Printf("═══════════════════════════════════════════════════════════\n")
 		fmt.Printf("Task %d/%d: %s - %s\n", i+1, len(tasks), task.ID, task.Title)
@@ -228,6 +231,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		}
 	}
 
+	taskProgress.Complete()
 	return printSummary(successCount, failureCount, session)
 }
 
@@ -268,9 +272,11 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 
 		// Execute agent
 		startTime := time.Now()
-		fmt.Printf("  → Running AI agent (%s)...\n", model)
 
+		spinner := ui.NewSpinner(fmt.Sprintf("Running AI agent (%s)...", model))
+		spinner.Start()
 		agentResult, err := runner.Run(model, prompt, logPath)
+		spinner.Stop()
 		duration := int(time.Since(startTime).Seconds())
 
 		if err != nil {
@@ -310,8 +316,10 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 		fmt.Printf("  ✓ Agent execution completed (%ds)\n", duration)
 
 		// Run verification
-		fmt.Printf("  → Running verification...\n")
+		verifySpinner := ui.NewSpinner("Running verification...")
+		verifySpinner.Start()
 		verifyResult, err := RunVerification(cfg, task.ID)
+		verifySpinner.Stop()
 		if err != nil {
 			return false, fmt.Errorf("verification execution failed: %w", err)
 		}

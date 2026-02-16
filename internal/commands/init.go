@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -59,8 +60,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Initialize project with spinner
+	spinner := ui.NewSpinner("Initializing project...")
+	spinner.Start()
+
 	// Create directory structure
 	if err := createDirectoryStructure(devloopDir); err != nil {
+		spinner.Stop()
 		return err
 	}
 
@@ -74,17 +80,21 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Save config
 	configPath := filepath.Join(devloopDir, "config.json")
 	if err := config.SaveConfig(configPath, cfg); err != nil {
+		spinner.Stop()
 		return err
 	}
 
 	// Create empty tasks.jsonl
 	tasksPath := filepath.Join(devloopDir, "tasks.jsonl")
 	if err := os.WriteFile(tasksPath, []byte(""), 0644); err != nil {
+		spinner.Stop()
 		return fmt.Errorf("failed to create tasks.jsonl: %w", err)
 	}
 
+	spinner.Stop()
+
 	// Success message
-	fmt.Println("✓ devloop initialized successfully!")
+	fmt.Println(ui.Success("devloop initialized successfully!"))
 	fmt.Printf("  Project: %s\n", projectName)
 	fmt.Printf("  Path: %s\n", cwd)
 	if techStack != "" {
