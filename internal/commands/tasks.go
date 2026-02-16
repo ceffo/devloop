@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
@@ -35,7 +36,7 @@ Example:
 	// Add subcommands
 	cmd.AddCommand(tasksListCmd())
 	cmd.AddCommand(tasksShowCmd())
-	// TODO: Add tasksUpdateCmd() in Task 2.6
+	cmd.AddCommand(tasksUpdateCmd())
 
 	return cmd
 }
@@ -395,4 +396,94 @@ func formatAttemptResult(result string, success bool) string {
 		return color.GreenString(result)
 	}
 	return color.RedString(result)
+}
+
+// tasksUpdateCmd returns the tasks update subcommand
+func tasksUpdateCmd() *cobra.Command {
+	var statusFlag string
+
+	cmd := &cobra.Command{
+		Use:   "update TASK_ID",
+		Short: "Update task status",
+		Long: `Update the status of a specific task.
+
+Valid status values:
+  - pending      Task is ready to be executed
+  - in_progress  Task is currently being executed
+  - completed    Task has been successfully completed
+  - failed       Task execution failed
+  - blocked      Task is blocked by dependencies
+  - archived     Task has been archived
+
+Example:
+  devloop tasks update 1.2 --status completed
+  devloop tasks update 2.5 --status blocked`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			taskID := args[0]
+
+			// Validate that status flag is provided
+			if statusFlag == "" {
+				return fmt.Errorf("--status flag is required")
+			}
+
+			// Validate status value
+			validStatuses := map[string]bool{
+				"pending":     true,
+				"in_progress": true,
+				"completed":   true,
+				"failed":      true,
+				"blocked":     true,
+				"archived":    true,
+			}
+
+			if !validStatuses[statusFlag] {
+				return fmt.Errorf("invalid status: %s (valid values: pending, in_progress, completed, failed, blocked, archived)", statusFlag)
+			}
+
+			// Get config path from persistent flags
+			configPath, _ := cmd.Flags().GetString("config")
+
+			// Load configuration
+			cfg, err := config.LoadConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Create storage
+			store := storage.NewStorage(cfg)
+
+			// Get task
+			task, err := store.GetTask(taskID)
+			if err != nil {
+				return fmt.Errorf("task not found: %s", taskID)
+			}
+
+			// Store old status for confirmation message
+			oldStatus := task.Status
+
+			// Update task status and timestamp
+			task.Status = statusFlag
+			task.Metadata.UpdatedAt = time.Now()
+
+			// Save updated task
+			if err := store.UpdateTask(task); err != nil {
+				return fmt.Errorf("failed to update task: %w", err)
+			}
+
+			// Display success message
+			fmt.Printf("Task %s status updated: %s → %s\n",
+				color.CyanString(taskID),
+				formatStatus(oldStatus),
+				formatStatus(statusFlag))
+
+			return nil
+		},
+	}
+
+	// Add flags
+	cmd.Flags().StringVar(&statusFlag, "status", "", "new status (required: pending, in_progress, completed, failed, blocked, archived)")
+	cmd.MarkFlagRequired("status")
+
+	return cmd
 }

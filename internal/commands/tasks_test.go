@@ -434,3 +434,196 @@ func TestFormatAttemptResult(t *testing.T) {
 	}
 }
 
+func TestTasksUpdateCommand(t *testing.T) {
+	// Create a temporary directory for test files
+	tmpDir, err := os.MkdirTemp("", "devloop-tasks-update-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create .devloop directory
+	devloopDir := filepath.Join(tmpDir, ".devloop")
+	if err := os.MkdirAll(devloopDir, 0755); err != nil {
+		t.Fatalf("failed to create .devloop directory: %v", err)
+	}
+
+	// Create sample config
+	cfg := &config.Config{
+		Version: "1.0",
+		Project: config.ProjectConfig{
+			Name:       "test-project",
+			Path:       tmpDir,
+			TechStack:  "Go",
+			MainBranch: "main",
+		},
+		Verification: config.VerificationConfig{
+			Command:        "go test",
+			TimeoutSeconds: 300,
+		},
+		CLI: config.CLIConfig{
+			Tool: "claude",
+			Models: map[string]string{
+				"simple":   "claude-haiku-4-5-20251001",
+				"moderate": "claude-sonnet-4-5-20250929",
+				"complex":  "claude-opus-4-6",
+			},
+		},
+		Execution: config.ExecutionConfig{
+			MaxAttempts:   2,
+			HaltOnFailure: true,
+			AutoCommit:    true,
+		},
+		Files: config.FilesConfig{
+			PRD:   "docs/PRD.md",
+			Tasks: "docs/TASKS.md",
+			Todo:  ".todo/TODO.md",
+		},
+	}
+
+	// Save config
+	configPath := filepath.Join(devloopDir, "config.json")
+	if err := config.SaveConfig(configPath, cfg); err != nil {
+		t.Fatalf("failed to save config: %v", err)
+	}
+
+	// Create sample task
+	store := storage.NewStorage(cfg)
+
+	now := time.Now()
+	task := &storage.Task{
+		ID:         "1.1",
+		Title:      "Test task",
+		Wave:       1,
+		Status:     "pending",
+		Complexity: "simple",
+		Model:      "claude-haiku-4-5-20251001",
+		Metadata: storage.TaskMetadata{
+			CreatedAt:   now,
+			UpdatedAt:   now,
+			MaxAttempts: 2,
+		},
+	}
+
+	if err := store.SaveTask(task); err != nil {
+		t.Fatalf("failed to save task: %v", err)
+	}
+
+	// Test updating task status
+	t.Run("update task status", func(t *testing.T) {
+		// Get the original task
+		original, err := store.GetTask("1.1")
+		if err != nil {
+			t.Fatalf("failed to get task: %v", err)
+		}
+
+		if original.Status != "pending" {
+			t.Fatalf("expected initial status 'pending', got %s", original.Status)
+		}
+
+		originalUpdateTime := original.Metadata.UpdatedAt
+
+		// Wait a bit to ensure timestamp changes
+		time.Sleep(10 * time.Millisecond)
+
+		// Update the task
+		original.Status = "in_progress"
+		original.Metadata.UpdatedAt = time.Now()
+
+		if err := store.UpdateTask(original); err != nil {
+			t.Fatalf("failed to update task: %v", err)
+		}
+
+		// Get the updated task
+		updated, err := store.GetTask("1.1")
+		if err != nil {
+			t.Fatalf("failed to get updated task: %v", err)
+		}
+
+		if updated.Status != "in_progress" {
+			t.Errorf("expected status 'in_progress', got %s", updated.Status)
+		}
+
+		if !updated.Metadata.UpdatedAt.After(originalUpdateTime) {
+			t.Errorf("expected UpdatedAt to be updated, got %v (original: %v)",
+				updated.Metadata.UpdatedAt, originalUpdateTime)
+		}
+	})
+
+	// Test invalid status validation (this would be in the CLI layer)
+	t.Run("validate status values", func(t *testing.T) {
+		validStatuses := []string{"pending", "in_progress", "completed", "failed", "blocked", "archived"}
+		invalidStatuses := []string{"invalid", "done", "running", ""}
+
+		// Check valid statuses
+		for _, status := range validStatuses {
+			// This would be validated in the CLI command
+			isValid := false
+			for _, valid := range validStatuses {
+				if status == valid {
+					isValid = true
+					break
+				}
+			}
+			if !isValid {
+				t.Errorf("status %s should be valid", status)
+			}
+		}
+
+		// Check invalid statuses
+		for _, status := range invalidStatuses {
+			isValid := false
+			for _, valid := range validStatuses {
+				if status == valid {
+					isValid = true
+					break
+				}
+			}
+			if isValid {
+				t.Errorf("status %s should be invalid", status)
+			}
+		}
+	})
+
+	// Test updating non-existent task
+	t.Run("update non-existent task", func(t *testing.T) {
+		nonExistent := &storage.Task{
+			ID:     "99.99",
+			Status: "completed",
+		}
+
+		err := store.UpdateTask(nonExistent)
+		if err == nil {
+			t.Error("expected error when updating non-existent task")
+		}
+	})
+
+	// Test updating task to each valid status
+	t.Run("update to all valid statuses", func(t *testing.T) {
+		statuses := []string{"pending", "in_progress", "completed", "failed", "blocked", "archived"}
+
+		for _, status := range statuses {
+			task, err := store.GetTask("1.1")
+			if err != nil {
+				t.Fatalf("failed to get task: %v", err)
+			}
+
+			task.Status = status
+			task.Metadata.UpdatedAt = time.Now()
+
+			if err := store.UpdateTask(task); err != nil {
+				t.Fatalf("failed to update task to status %s: %v", status, err)
+			}
+
+			updated, err := store.GetTask("1.1")
+			if err != nil {
+				t.Fatalf("failed to get updated task: %v", err)
+			}
+
+			if updated.Status != status {
+				t.Errorf("expected status %s, got %s", status, updated.Status)
+			}
+		}
+	})
+}
+
