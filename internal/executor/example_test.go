@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/yourusername/devloop/internal/executor"
+	"github.com/yourusername/devloop/internal/agent"
 )
 
 // Example demonstrates how to use the AgentRunner interface
 func ExampleAgentRunner() {
 	// Create a Claude runner
-	runner := executor.NewClaudeRunner()
+	runner := agent.NewClaudeRunner()
 
 	// Define execution parameters
 	model := "claude-sonnet-4-5-20250929"
@@ -42,7 +42,7 @@ func ExampleNewAgentRunner() {
 	tool := "claude"
 
 	// Create appropriate runner
-	runner, err := executor.NewAgentRunner(tool)
+	runner, err := agent.NewAgentRunner(tool)
 	if err != nil {
 		fmt.Printf("Error creating runner: %v\n", err)
 		return

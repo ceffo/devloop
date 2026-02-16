@@ -1,4 +1,4 @@
-package executor
+package agent
 
 import (
 	"os"
@@ -32,13 +32,13 @@ func TestNewAgentRunner(t *testing.T) {
 			name:        "claude tool",
 			tool:        "claude",
 			wantErr:     false,
-			expectedType: "*executor.ClaudeRunner",
+			expectedType: "*agent.ClaudeRunner",
 		},
 		{
 			name:        "copilot tool",
 			tool:        "copilot",
 			wantErr:     false,
-			expectedType: "*executor.CopilotRunner",
+			expectedType: "*agent.CopilotRunner",
 		},
 		{
 			name:    "unsupported tool",

@@ -13,8 +13,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/yourusername/devloop/internal/agent"
 	"github.com/yourusername/devloop/internal/config"
-	"github.com/yourusername/devloop/internal/executor"
 	"github.com/yourusername/devloop/internal/storage"
 )
 
@@ -232,7 +232,7 @@ func ProcessTodoItems(cfg *config.Config, todos []TodoItem, review bool) ([]*sto
 	}
 
 	// Create agent runner
-	agent, err := executor.NewAgentRunner(cfg.CLI.Tool)
+	agentRunner, err := agent.NewAgentRunner(cfg.CLI.Tool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create agent runner: %w", err)
 	}
@@ -240,7 +240,7 @@ func ProcessTodoItems(cfg *config.Config, todos []TodoItem, review bool) ([]*sto
 	// Execute Opus model (complex reasoning needed)
 	logPath := filepath.Join(cfg.Project.Path, ".devloop", "logs", fmt.Sprintf("todo-processing-%d.log", time.Now().Unix()))
 	model := cfg.CLI.Models["complex"] // Use Opus for complex reasoning
-	result, err := agent.Run(model, prompt, logPath)
+	result, err := agentRunner.Run(model, prompt, logPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run AI agent: %w", err)
 	}
