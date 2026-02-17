@@ -14,6 +14,9 @@ import (
 type Notifier interface {
 	// Init sets up the notifier with the full task list and session info.
 	Init(tasks []*storage.Task, sessionID, agentName string)
+	// SetCancelFunc registers a function that will be called when the user
+	// confirms an interrupt in the TUI. The executor passes its context cancel.
+	SetCancelFunc(cancel func())
 	// TaskStarted signals that a task has begun execution.
 	TaskStarted(taskID string, attempt, maxAttempts int)
 	// TaskCompleted signals that a task finished successfully.
@@ -34,8 +37,9 @@ type Notifier interface {
 
 // tuiNotifier drives the Bubble Tea TUI.
 type tuiNotifier struct {
-	program *tea.Program
-	errCh   chan error
+	program    *tea.Program
+	errCh      chan error
+	cancelFunc func()
 }
 
 func newTUINotifier() *tuiNotifier {
@@ -44,9 +48,16 @@ func newTUINotifier() *tuiNotifier {
 	}
 }
 
+func (n *tuiNotifier) SetCancelFunc(cancel func()) {
+	n.cancelFunc = cancel
+}
+
 func (n *tuiNotifier) Init(tasks []*storage.Task, sessionID, agentName string) {
 	items := storageTasks2TUIItems(tasks)
 	model := ui.NewTUIModel(items, sessionID, agentName)
+	if n.cancelFunc != nil {
+		model.SetCancelFunc(n.cancelFunc)
+	}
 	n.program = tea.NewProgram(model, tea.WithAltScreen())
 
 	// Run the TUI program in a background goroutine
@@ -130,6 +141,8 @@ type plainNotifier struct{}
 func newPlainNotifier() *plainNotifier {
 	return &plainNotifier{}
 }
+
+func (n *plainNotifier) SetCancelFunc(_ func()) {}
 
 func (n *plainNotifier) Init(tasks []*storage.Task, sessionID, agentName string) {
 	items := storageTasks2TUIItems(tasks)

@@ -113,6 +113,10 @@ type TUIModel struct {
 	// Agent output pane
 	showOutput  bool     // whether the output pane is visible
 	outputLines []string // streaming agent stdout/stderr lines
+
+	// Interrupt confirmation
+	confirmingQuit bool        // whether the confirmation dialog is shown
+	cancelFunc     func()      // called to cancel executor on confirmed quit
 }
 
 // NewTUIModel creates a new TUI model with the given tasks.
@@ -129,6 +133,12 @@ func NewTUIModel(tasks []TaskItem, sessionID, agentName string) TUIModel {
 	}
 }
 
+// SetCancelFunc registers a function to be called when the user confirms an interrupt.
+// The cancel function should stop the executor gracefully.
+func (m *TUIModel) SetCancelFunc(cancel func()) {
+	m.cancelFunc = cancel
+}
+
 // Init implements tea.Model.
 func (m TUIModel) Init() tea.Cmd {
 	return nil
@@ -138,10 +148,24 @@ func (m TUIModel) Init() tea.Cmd {
 func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// If confirmation dialog is active, handle y/n only
+		if m.confirmingQuit {
+			switch msg.String() {
+			case "y", "Y":
+				if m.cancelFunc != nil {
+					m.cancelFunc()
+				}
+				m.done = true
+				return m, tea.Quit
+			case "n", "N", "esc":
+				m.confirmingQuit = false
+			}
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "q", "ctrl+c":
-			m.done = true
-			return m, tea.Quit
+			m.confirmingQuit = true
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -274,12 +298,18 @@ func (m TUIModel) View() string {
 		}
 	}
 
-	// Footer
+	// Confirmation dialog (replaces footer when active)
 	b.WriteString(lipgloss.NewStyle().Foreground(colorGray).Render(
 		strings.Repeat("─", min(m.width, 80))) + "\n")
-	footerHint := "q: quit • ↑/↓: navigate • o: toggle output"
-	footer := lipgloss.NewStyle().Foreground(colorGray).Render(footerHint)
-	b.WriteString(footer)
+	if m.confirmingQuit {
+		prompt := lipgloss.NewStyle().Foreground(colorYellow).Bold(true).Render(
+			"⚠  Stop execution? Session will be saved and can be resumed. (y/n)")
+		b.WriteString(prompt)
+	} else {
+		footerHint := "q: quit • ↑/↓: navigate • o: toggle output"
+		footer := lipgloss.NewStyle().Foreground(colorGray).Render(footerHint)
+		b.WriteString(footer)
+	}
 
 	return b.String()
 }
@@ -381,4 +411,9 @@ func (m TUIModel) ShowOutput() bool {
 // OutputLines returns the accumulated agent output lines (for testing).
 func (m TUIModel) OutputLines() []string {
 	return m.outputLines
+}
+
+// ConfirmingQuit returns whether the quit confirmation dialog is active (for testing).
+func (m TUIModel) ConfirmingQuit() bool {
+	return m.confirmingQuit
 }

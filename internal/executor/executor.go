@@ -133,6 +133,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 
 	// Initialize TUI notifier (falls back to plain text for non-TTY)
 	notifier := NewNotifier()
+	notifier.SetCancelFunc(cancel)
 	notifier.Init(tasks, session.ID, selectedAgentName)
 
 	// Execute tasks with dynamic dependency reassessment

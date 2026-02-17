@@ -155,14 +155,134 @@ func TestTUIModelDoneMsg(t *testing.T) {
 func TestTUIModelQuit(t *testing.T) {
 	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
 
+	// Pressing 'q' should show the confirmation dialog, not quit immediately
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	m = updated.(TUIModel)
 
+	if m.Done() {
+		t.Error("expected done to be false after 'q' (confirmation required)")
+	}
+	if cmd != nil {
+		t.Error("expected no quit command after 'q' (confirmation required)")
+	}
+	if !m.ConfirmingQuit() {
+		t.Error("expected confirmingQuit to be true after 'q'")
+	}
+}
+
+func TestTUIModelQuitConfirmYes(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Trigger confirmation dialog
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = updated.(TUIModel)
+
+	// Confirm with 'y'
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m = updated.(TUIModel)
+
 	if !m.Done() {
-		t.Error("expected done to be true after 'q'")
+		t.Error("expected done to be true after confirming quit with 'y'")
 	}
 	if cmd == nil {
-		t.Error("expected quit command after 'q'")
+		t.Error("expected quit command after confirming with 'y'")
+	}
+}
+
+func TestTUIModelQuitConfirmNo(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Trigger confirmation dialog
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = updated.(TUIModel)
+
+	// Decline with 'n'
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m = updated.(TUIModel)
+
+	if m.Done() {
+		t.Error("expected done to be false after declining quit with 'n'")
+	}
+	if cmd != nil {
+		t.Error("expected no quit command after declining with 'n'")
+	}
+	if m.ConfirmingQuit() {
+		t.Error("expected confirmingQuit to be false after declining")
+	}
+}
+
+func TestTUIModelQuitConfirmEscape(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Trigger confirmation dialog
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = updated.(TUIModel)
+
+	// Dismiss with Escape
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(TUIModel)
+
+	if m.Done() {
+		t.Error("expected done to be false after pressing Escape")
+	}
+	if m.ConfirmingQuit() {
+		t.Error("expected confirmingQuit to be false after pressing Escape")
+	}
+}
+
+func TestTUIModelQuitWithCancelFunc(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	cancelCalled := false
+	m.SetCancelFunc(func() { cancelCalled = true })
+
+	// Trigger confirmation dialog
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = updated.(TUIModel)
+
+	// Confirm with 'y'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+
+	if !cancelCalled {
+		t.Error("expected cancel function to be called when confirming quit")
+	}
+}
+
+func TestTUIModelConfirmDialogView(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Trigger confirmation dialog
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = updated.(TUIModel)
+
+	view := m.View()
+	if !strings.Contains(view, "Stop execution?") {
+		t.Error("expected confirmation prompt to appear in view when confirmingQuit is true")
+	}
+	// Normal footer should not appear when confirming
+	if strings.Contains(view, "q: quit") {
+		t.Error("expected normal footer to be replaced by confirmation dialog")
+	}
+}
+
+func TestTUIModelNoNavigationDuringConfirm(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Trigger confirmation dialog
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = updated.(TUIModel)
+
+	initialCursor := m.Cursor()
+
+	// Navigation keys should be ignored during confirmation
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(TUIModel)
+
+	if m.Cursor() != initialCursor {
+		t.Error("expected cursor not to move while confirmation dialog is active")
+	}
+	if !m.ConfirmingQuit() {
+		t.Error("expected confirmingQuit to remain true after ignored navigation key")
 	}
 }
 
