@@ -4,10 +4,12 @@
     "name": "devloop",
     "path": "/home/moncef/code/devloop",
     "tech_stack": "Go 1.21+",
-    "main_branch": "main"
+    "main_branch": "main",
+    "task_id_prefix": "DEV",
+    "task_id_format": "jira"
   },
   "verification": {
-    "command": "go test ./... && go build ./cmd/devloop",
+    "command": "go test ./... \u0026\u0026 go build ./cmd/devloop",
     "timeout_seconds": 300
   },
   "cli": {
@@ -16,19 +18,25 @@
       "claude": {
         "tool": "claude",
         "models": {
-          "simple": "claude-haiku-4-5-20251001",
+          "complex": "claude-opus-4-6",
           "moderate": "claude-sonnet-4-5-20250929",
-          "complex": "claude-opus-4-6"
+          "simple": "claude-haiku-4-5-20251001"
         }
       },
       "copilot": {
         "tool": "copilot",
         "models": {
-          "simple": "claude-haiku-4.5",
+          "complex": "claude-opus-4.6",
           "moderate": "claude-sonnet-4.5",
-          "complex": "claude-opus-4.6"
+          "simple": "claude-haiku-4.5"
         }
       }
+    },
+    "tool": "claude",
+    "models": {
+      "complex": "claude-opus-4-6",
+      "moderate": "claude-sonnet-4-5-20250929",
+      "simple": "claude-haiku-4-5-20251001"
     }
   },
   "execution": {
@@ -40,20 +48,12 @@
   "files": {
     "prd": "docs/DESIGN.md",
     "tasks": "docs/TASKS.md",
-    "agents": "CLAUDE.md",
-    "todo": ""
+    "todo": ".todo/TODO.md"
   },
   "archival": {
-    "auto_archive": true,
-    "age_days": 0,
-    "output_dir": ".devloop/archive"
+    "auto_archive": true
   },
   "prompts": {
-    "task_context_files": [
-      "docs/DESIGN.md",
-      "CLAUDE.md",
-      "README.md"
-    ],
     "custom_instructions": "Follow Go conventions. Keep it simple. Test as you go."
   }
 }

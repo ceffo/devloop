@@ -168,6 +168,26 @@ func (s *Storage) UpdateTask(task *Task) error {
 	return nil
 }
 
+// DeleteAllTasks removes all tasks from storage
+// This is used during migration to rewrite all task IDs
+func (s *Storage) DeleteAllTasks() error {
+	path := s.getTasksFilePath()
+
+	// Create parent directory if missing
+	if err := os.MkdirAll(s.tasksDir, 0755); err != nil {
+		return fmt.Errorf("failed to create tasks directory: %w", err)
+	}
+
+	// Create empty file (truncate if exists)
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create empty tasks file: %w", err)
+	}
+	defer file.Close()
+
+	return nil
+}
+
 // GetTask finds and returns a task by ID
 func (s *Storage) GetTask(id string) (*Task, error) {
 	// Load all tasks

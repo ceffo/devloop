@@ -88,10 +88,16 @@ func MigrateTaskIDs(cfg *config.Config, opts MigrateTaskIDsOptions) error {
 
 	// Apply migration if not dry-run
 	if !opts.DryRun {
-		// Update each task in storage
+		// Delete all tasks and re-save them with new IDs
+		// This is necessary because UpdateTask searches by ID
+		if err := store.DeleteAllTasks(); err != nil {
+			return fmt.Errorf("failed to clear tasks for migration: %w", err)
+		}
+
+		// Save all tasks with updated IDs
 		for _, task := range tasks {
-			if err := store.UpdateTask(task); err != nil {
-				return fmt.Errorf("failed to update task %s: %w", task.ID, err)
+			if err := store.SaveTask(task); err != nil {
+				return fmt.Errorf("failed to save migrated task %s: %w", task.ID, err)
 			}
 		}
 
