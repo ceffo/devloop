@@ -38,6 +38,7 @@ See `docs/DESIGN.md` for full architecture documentation.
 **Waves** group related tasks by implementation phase. Tasks within a wave can execute in parallel unless blocked by dependencies.
 
 **Storage** uses append-only JSONL format:
+
 - `.devloop/tasks.jsonl` - One task per line, rewritten on updates
 - `.devloop/config.json` - Project configuration
 - `.devloop/logs/` - Execution logs
@@ -45,7 +46,7 @@ See `docs/DESIGN.md` for full architecture documentation.
 
 ### Package Structure
 
-```
+```text
 cmd/devloop/              # CLI entry point
 internal/
   agent/                  # AI agent runner (executes bash/gh commands)
@@ -61,38 +62,44 @@ internal/
 
 ### Data Flow
 
-**TODO Processing:**
-```
-TODO.md → Parse → AI Agent → JSON tasks → Validate → tasks.jsonl
-```
+**TODO Processing:** (see `docs/diagrams/todo-processing.md`)
 
-**Task Execution:**
-```
-tasks.jsonl → Query pending → Generate prompt → Run agent → 
+TODO.md → Parse → AI Agent → JSON tasks → Validate → tasks.jsonl
+
+**Task Execution:** (see `docs/diagrams/task-execution.md`)
+
+tasks.jsonl → Query pending → Generate prompt → Run agent →
 Verify → Commit (if success) → Update task → Checkpoint
-```
+
+**Session Recovery:** (see `docs/diagrams/session-recovery.md`)
+
+Load session → Find checkpoint → Query remaining tasks → Resume execution
 
 ## Code Conventions
 
 ### Go Standards
+
 - **Naming**: PascalCase for exports, camelCase for private
 - **Errors**: Always return errors, wrap with context: `fmt.Errorf("context: %w", err)`
 - **No panics**: Use error returns instead
 - **No globals**: Pass config/state explicitly via function parameters
 
 ### Testing
+
 - **Colocated tests**: `foo.go` → `foo_test.go`
 - **Table-driven tests** for multiple cases
 - **Coverage target**: >80% for critical packages (config, storage, executor)
 - **Mock external dependencies**: AI agents, git commands, filesystem ops
 
 ### Documentation
+
 - **Godoc on all exports**: Explain "why" not "what"
 - **Struct tags**: Use `json:"field_name"` for all config/storage structs
 
 ### Common Patterns
 
 **Error handling:**
+
 ```go
 if err != nil {
     return fmt.Errorf("failed to load config: %w", err)
@@ -100,6 +107,7 @@ if err != nil {
 ```
 
 **JSONL operations:**
+
 ```go
 encoder := json.NewEncoder(file)
 for _, item := range items {
@@ -110,6 +118,7 @@ for _, item := range items {
 ```
 
 **Struct validation:**
+
 ```go
 func (c *Config) Validate() error {
     if c.Project.Path == "" {
@@ -120,6 +129,7 @@ func (c *Config) Validate() error {
 ```
 
 **Cobra commands:**
+
 ```go
 var myCmd = &cobra.Command{
     Use:   "mycommand",
@@ -141,12 +151,14 @@ var myCmd = &cobra.Command{
 ### Key Design Decisions
 
 **JSONL vs SQLite:**
+
 - Debuggable with `cat`/`grep`
 - Git-friendly
 - No query complexity needed (<1000 tasks)
 - In-memory indexing provides fast lookups
 
 **Project-agnostic design:**
+
 - Configuration-driven (no hardcoded paths)
 - Can be distributed as standalone tool
 - Works with any tech stack
@@ -156,6 +168,7 @@ var myCmd = &cobra.Command{
 Tasks are tracked in `docs/TASKS.md` organized into 7 waves. Work sequentially—later tasks depend on earlier ones.
 
 **When implementing:**
+
 1. Read full task description in `docs/TASKS.md`
 2. Check dependencies (earlier tasks in same wave)
 3. Implement according to requirements
@@ -163,6 +176,7 @@ Tasks are tracked in `docs/TASKS.md` organized into 7 waves. Work sequentially�
 5. Commit with: `task X.Y: <title>` (lowercase, imperative)
 
 **Model annotations guide complexity:**
+
 - **haiku**: Simple changes (< 50 lines, single file)
 - **sonnet**: Moderate complexity (multi-file, state management)
 - **opus**: Complex logic (algorithms, workflows)
@@ -170,7 +184,8 @@ Tasks are tracked in `docs/TASKS.md` organized into 7 waves. Work sequentially�
 ## Commit Guidelines
 
 Use conventional commits:
-```
+
+```text
 task 1.2: implement configuration data structures
 fix(storage): handle missing JSONL file gracefully
 test(config): add validation tests
@@ -178,11 +193,13 @@ docs: update architecture diagram
 ```
 
 **Format:** `<type>[(scope)]: <description>`
+
 - Types: `task`, `feat`, `fix`, `test`, `docs`, `refactor`, `chore`
 - Scope: package name or area
 - Description: lowercase, imperative, no period
 
 **Before committing:**
+
 ```bash
 go test ./... && go build ./cmd/devloop
 ```
@@ -190,8 +207,12 @@ go test ./... && go build ./cmd/devloop
 ## Dependencies
 
 **Current:**
+
 - `github.com/spf13/cobra` - CLI framework
-- `github.com/fatih/color` - Terminal colors
+- `github.com/charmbracelet/lipgloss` - Terminal styling
+- `github.com/charmbracelet/bubbles` - Terminal UI components
+- `github.com/charmbracelet/bubbletea` - TUI framework for interactive features
+- `github.com/charmbracelet/glamour` - Markdown rendering
 - `github.com/olekukonko/tablewriter` - Table formatting
 - `github.com/google/uuid` - Session IDs
 
@@ -200,3 +221,4 @@ go test ./... && go build ./cmd/devloop
 - **`docs/DESIGN.md`** - Full architecture documentation
 - **`docs/TASKS.md`** - Implementation roadmap with task details
 - **`docs/GETTING_STARTED.md`** - Setup and usage guide
+- **`docs/diagrams/`** - Visual flow diagrams (Mermaid)

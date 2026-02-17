@@ -12,25 +12,14 @@ This project uses **bootstrap development**: we use the existing Modal `dev-loop
 
 ## Project Structure
 
-```
-devloop/
-├── cmd/devloop/          # CLI entry point
-├── internal/             # Core packages
-│   ├── config/           # Configuration management
-│   ├── storage/          # Task storage (JSONL)
-│   ├── executor/         # Task execution engine
-│   ├── processor/        # TODO processing
-│   ├── archiver/         # Archival system
-│   ├── prompts/          # AI prompt templates
-│   ├── commands/         # CLI commands
-│   └── ui/               # Terminal UI helpers
-├── docs/                 # Documentation
-│   ├── TASKS.md          # Implementation roadmap
-│   ├── DESIGN.md         # Architecture documentation
-│   └── GETTING_STARTED.md # This file
-├── scripts/              # Helper scripts
-└── .devloop/             # Dev-loop state and config
-```
+See [project structure diagram](diagrams/project-structure.md) for a visual representation.
+
+Key directories:
+
+- **`cmd/devloop/`**: CLI entry point
+- **`internal/`**: Core packages (agent, archiver, commands, config, executor, processor, prompts, storage, ui)
+- **`docs/`**: Architecture and usage documentation with diagrams
+- **`.devloop/`**: Per-project state (config, tasks, logs, archive)
 
 ## Quick Start
 
@@ -67,6 +56,7 @@ cd /home/moncef/code/devloop
 ```
 
 The dev-loop.sh script will:
+
 1. Read tasks from `docs/TASKS.md`
 2. Select appropriate model based on complexity
 3. Execute each task with AI agent
@@ -75,17 +65,17 @@ The dev-loop.sh script will:
 
 ## Implementation Waves
 
-Tasks are organized into 7 waves (see `docs/TASKS.md`):
+Tasks are organized into 7 waves (see `docs/TASKS.md`). Work sequentially—later waves depend on earlier ones.
 
-1. **Wave 1**: Core Infrastructure (config, storage)
-2. **Wave 2**: CLI Commands Foundation
-3. **Wave 3**: TODO Processing System
-4. **Wave 4**: Execution Engine
-5. **Wave 5**: Archival System
-6. **Wave 6**: Session Management & Polish
-7. **Wave 7**: Testing & Release
+**Current Status**: Waves 1-5 are largely complete. The system is functional with core features implemented:
 
-**Work sequentially** - later waves depend on earlier ones.
+1. ✅ **Wave 1**: Core Infrastructure (config, storage)
+2. ✅ **Wave 2**: CLI Commands Foundation
+3. ✅ **Wave 3**: TODO Processing System
+4. ✅ **Wave 4**: Execution Engine
+5. ✅ **Wave 5**: Archival System
+6. 🚧 **Wave 6**: Session Management & Polish (in progress)
+7. ⏳ **Wave 7**: Testing & Release (pending)
 
 ## Manual Development
 
@@ -97,11 +87,14 @@ If you prefer manual development instead of using dev-loop.sh:
 2. **Check dependencies** - ensure prerequisite tasks are complete
 3. **Implement** following requirements and acceptance criteria
 4. **Test** your changes:
+
    ```bash
    go test ./...
    go build ./cmd/devloop
    ```
+
 5. **Commit** using format: `task X.Y: <title>`
+
    ```bash
    git add -A
    git commit -m "task 1.2: implement configuration data structures"
@@ -203,12 +196,14 @@ git log --oneline -10
 ## Troubleshooting
 
 ### Build fails
+
 ```bash
 go mod tidy
 go build ./cmd/devloop
 ```
 
 ### Tests fail
+
 ```bash
 # Run specific failing test
 go test -v ./internal/config -run TestLoadConfig
@@ -218,6 +213,7 @@ go test -cover ./...
 ```
 
 ### dev-loop.sh not found
+
 ```bash
 # Ensure Modal project exists
 ls ~/code/modal/scripts/dev-loop.sh

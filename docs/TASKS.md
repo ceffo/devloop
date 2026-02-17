@@ -11,6 +11,7 @@ This file tracks the implementation of the devloop system. Tasks are organized i
 Set up the Go project with required dependencies.
 
 **Requirements:**
+
 - Add cobra for CLI framework: `go get github.com/spf13/cobra@latest`
 - Add color for terminal output: `go get github.com/fatih/color@latest`
 - Add tablewriter for formatting: `go get github.com/olekukonko/tablewriter@latest`
@@ -18,6 +19,7 @@ Set up the Go project with required dependencies.
 - Verify `go mod tidy` runs successfully
 
 **Acceptance:**
+
 - All dependencies in go.mod
 - `go build ./cmd/devloop` succeeds
 - .gitignore includes: `*.exe`, `*.test`, `.devloop/`, `devloop` binary
@@ -29,6 +31,7 @@ Set up the Go project with required dependencies.
 Implement configuration schema and loading in `internal/config/`.
 
 **Requirements:**
+
 - Create `internal/config/config.go` with all structs from design doc:
   - Config, ProjectConfig, VerificationConfig, CLIConfig, ExecutionConfig
   - FilesConfig, ArchivalConfig, PromptsConfig
@@ -38,6 +41,7 @@ Implement configuration schema and loading in `internal/config/`.
 - Create `SaveConfig(path string, cfg *Config) error` function
 
 **Acceptance:**
+
 - Compiles without errors
 - Can load sample config.json
 - Can save config to JSON
@@ -50,6 +54,7 @@ Implement configuration schema and loading in `internal/config/`.
 Add validation logic to ensure configuration is valid.
 
 **Requirements:**
+
 - Create `internal/config/validate.go`
 - Implement `Validate() error` method on Config
 - Check: project path exists
@@ -59,6 +64,7 @@ Add validation logic to ensure configuration is valid.
 - Check: max_attempts > 0
 
 **Acceptance:**
+
 - Invalid config returns descriptive errors
 - Valid config passes validation
 - All edge cases covered (empty strings, negative numbers)
@@ -70,6 +76,7 @@ Add validation logic to ensure configuration is valid.
 Implement task storage structures in `internal/storage/`.
 
 **Requirements:**
+
 - Create `internal/storage/task.go` with:
   - Task struct with all fields from design doc
   - TaskMetadata, TaskExecution, Attempt, TaskResults structs
@@ -81,6 +88,7 @@ Implement task storage structures in `internal/storage/`.
   - `AddAttempt(attempt Attempt)` - append attempt to history
 
 **Acceptance:**
+
 - Compiles without errors
 - Can marshal/unmarshal Task to/from JSON
 - Helper methods work correctly
@@ -92,6 +100,7 @@ Implement task storage structures in `internal/storage/`.
 Implement JSONL read/write operations.
 
 **Requirements:**
+
 - Create `internal/storage/storage.go`
 - Implement `Storage` struct with config reference
 - Methods:
@@ -104,6 +113,7 @@ Implement JSONL read/write operations.
 - Create parent directories if missing
 
 **Acceptance:**
+
 - Can write and read tasks to/from JSONL
 - Update modifies existing task correctly
 - Handles non-existent files gracefully
@@ -116,6 +126,7 @@ Implement JSONL read/write operations.
 Add query capabilities for filtering tasks.
 
 **Requirements:**
+
 - Create `internal/storage/index.go`
 - Implement `Filter` struct with optional fields:
   - Status string
@@ -128,6 +139,7 @@ Add query capabilities for filtering tasks.
 - Return tasks sorted by ID (ascending)
 
 **Acceptance:**
+
 - Can filter by status
 - Can filter by wave
 - Can filter by complexity
@@ -144,6 +156,7 @@ Add query capabilities for filtering tasks.
 Set up cobra CLI structure with root command and subcommands.
 
 **Requirements:**
+
 - Create `cmd/devloop/main.go` with root command
 - Root command metadata: name, short/long descriptions
 - Create placeholder subcommands (no implementation yet):
@@ -153,6 +166,7 @@ Set up cobra CLI structure with root command and subcommands.
 - Add `--verbose` global flag for debug output
 
 **Acceptance:**
+
 - `go build ./cmd/devloop` succeeds
 - `./devloop --help` shows all subcommands
 - `./devloop <subcommand> --help` shows subcommand help
@@ -165,6 +179,7 @@ Set up cobra CLI structure with root command and subcommands.
 Create the `devloop init` command to initialize a project.
 
 **Requirements:**
+
 - Create `internal/commands/init.go`
 - Implement InitCmd cobra command
 - Create `.devloop/` directory structure:
@@ -177,6 +192,7 @@ Create the `devloop init` command to initialize a project.
 - Prompt before overwriting existing .devloop/
 
 **Acceptance:**
+
 - Creates `.devloop/` structure
 - Generates valid config.json
 - Detects project metadata
@@ -190,6 +206,7 @@ Create the `devloop init` command to initialize a project.
 Add `devloop config show` and `devloop config validate` commands.
 
 **Requirements:**
+
 - Create `internal/commands/config.go`
 - `config show`: Pretty-print config JSON with colors
 - `config validate`: Load config and run Validate(), print results
@@ -197,6 +214,7 @@ Add `devloop config show` and `devloop config validate` commands.
 - Show ✓/✗ symbols for validation results
 
 **Acceptance:**
+
 - `devloop config show` displays JSON
 - `devloop config validate` catches invalid configs
 - Output is readable and colored
@@ -208,6 +226,7 @@ Add `devloop config show` and `devloop config validate` commands.
 Create task listing with filtering options.
 
 **Requirements:**
+
 - Create `internal/commands/tasks.go`
 - Implement `tasks list` subcommand
 - Flags:
@@ -220,6 +239,7 @@ Create task listing with filtering options.
 - Color-code status: green (completed), yellow (in_progress), red (failed)
 
 **Acceptance:**
+
 - Lists all tasks when no filters
 - Filters work correctly
 - Table is formatted nicely
@@ -232,6 +252,7 @@ Create task listing with filtering options.
 Display detailed task information.
 
 **Requirements:**
+
 - Implement `tasks show TASK_ID` subcommand
 - Display all task fields in readable format:
   - Metadata section
@@ -242,6 +263,7 @@ Display detailed task information.
 - Show full attempt details: model, duration, result, log path
 
 **Acceptance:**
+
 - Shows complete task details
 - Formats nicely
 - Handles missing task ID gracefully
@@ -253,12 +275,14 @@ Display detailed task information.
 Allow manual task status updates.
 
 **Requirements:**
+
 - Implement `tasks update TASK_ID --status STATUS` subcommand
 - Validate status values (pending|in_progress|completed|failed|blocked|archived)
 - Update task.UpdatedAt timestamp
 - Save to JSONL
 
 **Acceptance:**
+
 - Updates task status
 - Validates status values
 - Rejects invalid task IDs
@@ -273,6 +297,7 @@ Allow manual task status updates.
 Parse TODO markdown files into structured data.
 
 **Requirements:**
+
 - Create `internal/processor/todo.go`
 - Implement TodoItem struct: ID, Category, Content, Priority
 - Implement `ParseTodoFile(path string) ([]TodoItem, error)`
@@ -283,6 +308,7 @@ Parse TODO markdown files into structured data.
 - Handle checkboxes `- [ ]` and `- [x]`
 
 **Acceptance:**
+
 - Parses sample TODO.md correctly
 - Extracts categories and items
 - Handles various markdown formats
@@ -295,6 +321,7 @@ Parse TODO markdown files into structured data.
 Create prompt templates for AI agents.
 
 **Requirements:**
+
 - Create `internal/prompts/templates.go`
 - Define const for TodoProcessingPrompt (from design doc)
 - Define const for TaskExecutionPrompt (from design doc)
@@ -304,6 +331,7 @@ Create prompt templates for AI agents.
 - Use `text/template` for variable substitution
 
 **Acceptance:**
+
 - Prompts render correctly with variables
 - Handles empty/nil values gracefully
 - Output matches design doc examples
@@ -315,6 +343,7 @@ Create prompt templates for AI agents.
 Create abstraction for running AI CLI tools.
 
 **Requirements:**
+
 - Create `internal/executor/agent.go`
 - Define AgentRunner interface: `Run(model, prompt, logPath string) (*AgentResult, error)`
 - Implement ClaudeRunner struct
@@ -325,6 +354,7 @@ Create abstraction for running AI CLI tools.
 - Return success based on exit code
 
 **Acceptance:**
+
 - Interface is well-defined
 - ClaudeRunner can execute claude CLI
 - Logs are written to file
@@ -337,6 +367,7 @@ Create abstraction for running AI CLI tools.
 Implement AI-driven TODO processing to generate tasks.
 
 **Requirements:**
+
 - Create `ProcessTodoItems(cfg *Config, todos []TodoItem, review bool) ([]*Task, error)` in processor/todo.go
 - Generate next available task ID (query max existing ID + 1)
 - Render TodoProcessingPrompt with context
@@ -353,6 +384,7 @@ Implement AI-driven TODO processing to generate tasks.
 - Return tasks for saving
 
 **Acceptance:**
+
 - Parses TODO items and calls agent
 - Handles JSON parsing robustly
 - Assigns models correctly based on complexity
@@ -366,6 +398,7 @@ Implement AI-driven TODO processing to generate tasks.
 Create CLI command to process TODO files.
 
 **Requirements:**
+
 - Create `internal/commands/todo.go`
 - Implement `todo process FILE` subcommand
 - Flags:
@@ -378,6 +411,7 @@ Create CLI command to process TODO files.
 - Save tasks to JSONL if approved
 
 **Acceptance:**
+
 - `devloop todo process .todo/TODO.md` works
 - Review mode shows tasks and prompts
 - Tasks are saved to JSONL
@@ -392,6 +426,7 @@ Create CLI command to process TODO files.
 Implement verification command execution.
 
 **Requirements:**
+
 - Create `internal/executor/verify.go`
 - Implement `RunVerification(cfg *Config, taskID string) (*VerifyResult, error)`
 - VerifyResult struct: Success bool, Output string, LogPath string, Duration int
@@ -402,6 +437,7 @@ Implement verification command execution.
 - Return success based on exit code
 
 **Acceptance:**
+
 - Executes verification command
 - Respects timeout
 - Captures output
@@ -415,6 +451,7 @@ Implement verification command execution.
 Implement automatic git commits for completed tasks.
 
 **Requirements:**
+
 - Create `internal/executor/commit.go`
 - Implement `AutoCommit(cfg *Config, task *Task) (string, error)`
 - Generate commit message from template in config.Execution.CommitFormat
@@ -426,6 +463,7 @@ Implement automatic git commits for completed tasks.
 - Return commit hash
 
 **Acceptance:**
+
 - Generates commit message correctly
 - Executes git commands
 - Returns commit hash
@@ -438,6 +476,7 @@ Implement automatic git commits for completed tasks.
 Implement session tracking for crash recovery.
 
 **Requirements:**
+
 - Create `internal/executor/session.go`
 - Session struct: ID, StartedAt, LastCheckpoint, TasksCompleted, TasksFailed
 - Implement:
@@ -448,6 +487,7 @@ Implement session tracking for crash recovery.
 - Create state directory if missing
 
 **Acceptance:**
+
 - Creates new session with UUID
 - Saves session to JSON
 - Loads existing session
@@ -460,6 +500,7 @@ Implement session tracking for crash recovery.
 Implement the core dev loop execution engine.
 
 **Requirements:**
+
 - Create `internal/executor/executor.go`
 - Implement `ExecuteDevLoop(cfg *Config, wave int, taskID string, continueSession bool) error`
 - Workflow:
@@ -481,6 +522,7 @@ Implement the core dev loop execution engine.
 - Log progress with colors and progress indicators
 
 **Acceptance:**
+
 - Executes tasks in order
 - Handles retries correctly
 - Runs verification after each attempt
@@ -496,6 +538,7 @@ Implement the core dev loop execution engine.
 Create CLI command to execute dev loop.
 
 **Requirements:**
+
 - Create `internal/commands/run.go`
 - Implement `run` command
 - Flags:
@@ -511,6 +554,7 @@ Create CLI command to execute dev loop.
   - Success rate
 
 **Acceptance:**
+
 - `devloop run` executes all pending tasks
 - Filters work (--wave, --task)
 - --continue resumes from checkpoint
@@ -525,6 +569,7 @@ Create CLI command to execute dev loop.
 Define archive metadata structures.
 
 **Requirements:**
+
 - Create `internal/archiver/archiver.go`
 - Define Archive struct:
   - Wave int
@@ -538,6 +583,7 @@ Define archive metadata structures.
   - `SaveArchiveIndex(cfg *Config, index map[int]Archive) error`
 
 **Acceptance:**
+
 - Structs defined correctly
 - Can load/save archive index
 - Handles missing index file
@@ -549,6 +595,7 @@ Define archive metadata structures.
 Export completed tasks to archive JSONL.
 
 **Requirements:**
+
 - Implement `ArchiveWaveToJSONL(cfg *Config, storage *storage.Storage, wave int) (string, error)`
 - Query all tasks with status=completed and wave=N
 - Write to `.devloop/archive/wave-N.jsonl`
@@ -556,6 +603,7 @@ Export completed tasks to archive JSONL.
 - Return output file path
 
 **Acceptance:**
+
 - Exports completed tasks to JSONL
 - File format is valid JSONL
 - Handles empty wave gracefully
@@ -568,6 +616,7 @@ Export completed tasks to archive JSONL.
 Generate human-readable archive summaries.
 
 **Requirements:**
+
 - Implement `GenerateArchiveSummary(cfg *Config, tasks []*storage.Task, wave int) (string, error)`
 - Create markdown document with:
   - Header: "Wave N - Completed Tasks"
@@ -584,6 +633,7 @@ Generate human-readable archive summaries.
 - Return file path
 
 **Acceptance:**
+
 - Generates readable markdown
 - Includes all task details
 - Formats nicely
@@ -596,6 +646,7 @@ Generate human-readable archive summaries.
 Orchestrate the full archival process.
 
 **Requirements:**
+
 - Implement `ArchiveWave(cfg *Config, storage *storage.Storage, wave int) error` in archiver.go
 - Workflow:
   1. Validate wave has completed tasks
@@ -608,6 +659,7 @@ Orchestrate the full archival process.
 - Return error if wave has no completed tasks
 
 **Acceptance:**
+
 - Full archival workflow works
 - Creates both JSONL and markdown
 - Updates task statuses
@@ -621,6 +673,7 @@ Orchestrate the full archival process.
 Create CLI command for archiving waves.
 
 **Requirements:**
+
 - Create `internal/commands/archive.go`
 - Implement `archive` command
 - Flags:
@@ -631,6 +684,7 @@ Create CLI command for archiving waves.
 - Display summary of archived tasks
 
 **Acceptance:**
+
 - `devloop archive --wave 1` works
 - `devloop archive --auto` finds and archives completed waves
 - Displays summary
@@ -642,6 +696,7 @@ Create CLI command for archiving waves.
 Add automatic archival to executor when wave completes.
 
 **Requirements:**
+
 - Modify `internal/executor/executor.go`
 - After all tasks in wave complete:
   - Check if config.Archival.AutoArchive is true
@@ -650,6 +705,7 @@ Add automatic archival to executor when wave completes.
 - Only archive if ALL tasks in wave are completed or failed
 
 **Acceptance:**
+
 - Wave auto-archives when complete
 - Respects config setting
 - Logs action
@@ -664,6 +720,7 @@ Add automatic archival to executor when wave completes.
 Display current session information.
 
 **Requirements:**
+
 - Create `internal/commands/session.go`
 - Implement `session status` subcommand
 - Display:
@@ -676,6 +733,7 @@ Display current session information.
 - Use colors for visual clarity
 
 **Acceptance:**
+
 - Shows session details
 - Formats nicely
 - Handles no session gracefully
@@ -687,6 +745,7 @@ Display current session information.
 Implement crash recovery from checkpoint.
 
 **Requirements:**
+
 - Implement `session recover` subcommand
 - Load session state
 - Find last checkpoint task
@@ -699,6 +758,7 @@ Implement crash recovery from checkpoint.
 - Call ExecuteDevLoop with continue=true
 
 **Acceptance:**
+
 - Recovers from checkpoint
 - Shows recovery plan
 - Resumes execution correctly
@@ -711,6 +771,7 @@ Implement crash recovery from checkpoint.
 Add consistent UI formatting across all commands.
 
 **Requirements:**
+
 - Create `internal/ui/ui.go`
 - Implement helper functions:
   - `Success(format string, args ...interface{})` - green ✓
@@ -724,6 +785,7 @@ Add consistent UI formatting across all commands.
 - Support NO_COLOR env var
 
 **Acceptance:**
+
 - UI helpers work across all commands
 - Colors display correctly
 - NO_COLOR disables colors
@@ -736,6 +798,7 @@ Add consistent UI formatting across all commands.
 Add progress bars/spinners for long operations.
 
 **Requirements:**
+
 - Add dependency: `go get github.com/schollz/progressbar/v3`
 - Update executor.go to show progress:
   - Overall wave progress: "Task 3/10"
@@ -745,6 +808,7 @@ Add progress bars/spinners for long operations.
 - Make progress optional with --quiet flag
 
 **Acceptance:**
+
 - Progress indicators display during execution
 - Updates in real-time
 - --quiet suppresses progress
@@ -757,6 +821,7 @@ Add progress bars/spinners for long operations.
 Improve error messages and handling throughout.
 
 **Requirements:**
+
 - Define custom error types in `internal/errors/errors.go`:
   - ErrConfigNotFound
   - ErrTaskNotFound
@@ -769,6 +834,7 @@ Improve error messages and handling throughout.
 - Add --debug flag for verbose error output
 
 **Acceptance:**
+
 - Errors are informative
 - Hints guide users
 - Debug mode shows stack traces
@@ -781,6 +847,7 @@ Improve error messages and handling throughout.
 Generate documentation from code.
 
 **Requirements:**
+
 - Create `docs/ARCHITECTURE.md` documenting:
   - Component structure
   - Data flow
@@ -792,6 +859,7 @@ Generate documentation from code.
 - Create `make docs` command to regenerate
 
 **Acceptance:**
+
 - Documentation is complete
 - Godoc comments on all exports
 - make docs regenerates docs
@@ -806,6 +874,7 @@ Generate documentation from code.
 Add comprehensive unit tests for config package.
 
 **Requirements:**
+
 - Create `internal/config/config_test.go`
 - Test LoadConfig with valid/invalid JSON
 - Test Validate with various invalid configs
@@ -814,6 +883,7 @@ Add comprehensive unit tests for config package.
 - Achieve >80% coverage
 
 **Acceptance:**
+
 - All tests pass
 - Coverage >80%
 - Tests are readable
@@ -826,6 +896,7 @@ Add comprehensive unit tests for config package.
 Add comprehensive unit tests for storage package.
 
 **Requirements:**
+
 - Create `internal/storage/storage_test.go`
 - Create `internal/storage/task_test.go`
 - Test JSONL read/write
@@ -836,6 +907,7 @@ Add comprehensive unit tests for storage package.
 - Achieve >80% coverage
 
 **Acceptance:**
+
 - All tests pass
 - Coverage >80%
 - Tests clean up temp files
@@ -848,6 +920,7 @@ Add comprehensive unit tests for storage package.
 Create end-to-end integration tests.
 
 **Requirements:**
+
 - Create `tests/integration_test.go`
 - Set up test project structure in temp directory
 - Test full workflow:
@@ -863,6 +936,7 @@ Create end-to-end integration tests.
 - Test error scenarios (verification fails, agent fails)
 
 **Acceptance:**
+
 - Integration tests pass
 - Full workflow tested
 - Mocking works correctly
@@ -875,6 +949,7 @@ Create end-to-end integration tests.
 Test all CLI commands execute without panics.
 
 **Requirements:**
+
 - Create `tests/cli_test.go`
 - Test each command with --help flag
 - Test each command with invalid arguments (should error, not panic)
@@ -882,6 +957,7 @@ Test all CLI commands execute without panics.
 - Test all flags are recognized
 
 **Acceptance:**
+
 - All commands show help
 - Invalid args produce errors, not panics
 - Missing config handled gracefully
@@ -894,6 +970,7 @@ Test all CLI commands execute without panics.
 Set up build automation and release process.
 
 **Requirements:**
+
 - Create `Makefile` with targets:
   - `make build` - build binary
   - `make test` - run all tests
@@ -909,6 +986,7 @@ Set up build automation and release process.
   - Build for linux/mac/windows
 
 **Acceptance:**
+
 - `make build` produces binary
 - `make test` runs all tests
 - `make lint` passes
@@ -922,6 +1000,7 @@ Set up build automation and release process.
 Create example project and getting started guide.
 
 **Requirements:**
+
 - Create `examples/sample-project/` with:
   - Simple Go/Node project
   - `.todo/TODO.md` with sample items
@@ -937,6 +1016,7 @@ Create example project and getting started guide.
 - Create `docs/FAQ.md` with common questions
 
 **Acceptance:**
+
 - Example project runs successfully
 - Tutorial is complete and clear
 - FAQ covers common issues
@@ -945,6 +1025,7 @@ Create example project and getting started guide.
 ## Completion Criteria
 
 All tasks completed when:
+
 - ✓ All 7 waves complete
 - ✓ Unit test coverage >80%
 - ✓ Integration tests pass
