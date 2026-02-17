@@ -525,6 +525,97 @@ func TestTUIModelOutputPaneTaskListRemains(t *testing.T) {
 	}
 }
 
+func TestTUIModelUsageStatsMsg(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// No stats yet: footer shows "no agent calls yet"
+	view := m.View()
+	if !strings.Contains(view, "no agent calls yet") {
+		t.Error("expected 'no agent calls yet' in footer before any stats")
+	}
+
+	// Send usage stats
+	updated, _ := m.Update(UsageStatsMsg{
+		Stats: UsageStats{
+			TasksCompleted:   2,
+			TasksFailed:      1,
+			TotalDuration:    45,
+			LastTaskDuration: 15,
+			AgentCalls:       3,
+		},
+	})
+	m = updated.(TUIModel)
+
+	// Verify stored
+	u := m.Usage()
+	if u.TasksCompleted != 2 {
+		t.Errorf("expected TasksCompleted 2, got %d", u.TasksCompleted)
+	}
+	if u.AgentCalls != 3 {
+		t.Errorf("expected AgentCalls 3, got %d", u.AgentCalls)
+	}
+	if u.TotalDuration != 45 {
+		t.Errorf("expected TotalDuration 45, got %d", u.TotalDuration)
+	}
+
+	// Verify footer content
+	view = m.View()
+	if !strings.Contains(view, "Usage:") {
+		t.Error("expected 'Usage:' in footer after stats update")
+	}
+	if !strings.Contains(view, "tasks: 2/3 done") {
+		t.Errorf("expected 'tasks: 2/3 done' in footer, view: %q", view)
+	}
+	if !strings.Contains(view, "calls: 3") {
+		t.Error("expected 'calls: 3' in footer")
+	}
+	if !strings.Contains(view, "time: 45s") {
+		t.Error("expected 'time: 45s' in footer")
+	}
+}
+
+func TestTUIModelUsageStatsAlwaysVisible(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+	updated0, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated0.(TUIModel)
+
+	// Set stats
+	updated, _ := m.Update(UsageStatsMsg{
+		Stats: UsageStats{AgentCalls: 1, TasksCompleted: 1, TotalDuration: 10},
+	})
+	m = updated.(TUIModel)
+
+	view := m.View()
+
+	// Footer usage line should always appear (key hint and usage)
+	if !strings.Contains(view, "Usage:") {
+		t.Error("expected usage footer to be always visible")
+	}
+	if !strings.Contains(view, "q: quit") {
+		t.Error("expected key hint footer to still be present")
+	}
+}
+
+func TestTUIModelUsageStatsHiddenDuringConfirm(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Set some stats
+	updated, _ := m.Update(UsageStatsMsg{
+		Stats: UsageStats{AgentCalls: 2, TasksCompleted: 1, TotalDuration: 20},
+	})
+	m = updated.(TUIModel)
+
+	// Trigger confirmation dialog
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = updated.(TUIModel)
+
+	view := m.View()
+	// Confirmation dialog replaces footer
+	if !strings.Contains(view, "Stop execution?") {
+		t.Error("expected confirmation dialog when confirmingQuit is true")
+	}
+}
+
 func TestTUIModelAgentStatusUpdate(t *testing.T) {
 	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
 

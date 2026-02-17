@@ -10,6 +10,7 @@ import (
 	"github.com/ceffo/devloop/internal/agent"
 	"github.com/ceffo/devloop/internal/config"
 	"github.com/ceffo/devloop/internal/storage"
+	"github.com/ceffo/devloop/internal/ui"
 )
 
 // mockAgentRunner is a mock implementation of AgentRunner for testing
@@ -123,7 +124,7 @@ func TestExecuteTaskSuccess(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier())
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier(), &ui.UsageStats{})
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)
@@ -216,7 +217,7 @@ func TestExecuteTaskRetry(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier())
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier(), &ui.UsageStats{})
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)
@@ -306,7 +307,7 @@ func TestExecuteTaskAgentError(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier())
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier(), &ui.UsageStats{})
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)

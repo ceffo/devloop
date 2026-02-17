@@ -29,6 +29,8 @@ type Notifier interface {
 	Log(msg string)
 	// AgentOutput sends a line of raw agent stdout/stderr to the output pane.
 	AgentOutput(line string)
+	// UsageStatsUpdate updates the usage stats footer with current metrics.
+	UsageStatsUpdate(stats ui.UsageStats)
 	// Done signals that execution is complete. Called before summary.
 	Done(err error)
 	// Wait blocks until the notifier has finished (TUI closed, etc).
@@ -125,6 +127,12 @@ func (n *tuiNotifier) AgentOutput(line string) {
 	}
 }
 
+func (n *tuiNotifier) UsageStatsUpdate(stats ui.UsageStats) {
+	if n.program != nil {
+		n.program.Send(ui.UsageStatsMsg{Stats: stats})
+	}
+}
+
 func (n *tuiNotifier) Done(err error) {
 	if n.program != nil {
 		n.program.Send(ui.DoneMsg{Err: err})
@@ -173,6 +181,8 @@ func (n *plainNotifier) AgentOutput(line string) {
 	// In plain mode, agent output is written to the log file only; suppress here.
 	_ = line
 }
+
+func (n *plainNotifier) UsageStatsUpdate(_ ui.UsageStats) {}
 
 func (n *plainNotifier) Done(_ error) {}
 

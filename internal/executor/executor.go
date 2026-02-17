@@ -141,6 +141,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 	failureCount := 0
 	executedTaskIDs := make(map[string]bool) // Track what we've already executed
 	taskNumber := 0
+	sessionStats := &ui.UsageStats{}
 
 	for len(tasks) > 0 {
 		// Get next task
@@ -193,11 +194,13 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 			taskNumber, task.ID, task.Title, task.Complexity, model, selectedAgentName))
 
 		// Execute task with retries, passing notifier for status updates
-		success, err := executeTask(ctx, cfg, store, agentRunner, task, model, notifier)
+		success, err := executeTask(ctx, cfg, store, agentRunner, task, model, notifier, sessionStats)
 		if err != nil {
 			notifier.TaskFailed(task.ID)
 			notifier.Log(fmt.Sprintf("Task %s error: %v", task.ID, err))
 			failureCount++
+			sessionStats.TasksFailed++
+			notifier.UsageStatsUpdate(*sessionStats)
 			session.TasksFailed = append(session.TasksFailed, task.ID)
 
 			// Save session state
@@ -218,6 +221,8 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		if success {
 			notifier.TaskCompleted(task.ID)
 			successCount++
+			sessionStats.TasksCompleted++
+			notifier.UsageStatsUpdate(*sessionStats)
 			session.TasksCompleted = append(session.TasksCompleted, task.ID)
 
 			// After successful completion, check for newly-unblocked tasks
@@ -247,6 +252,8 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 			notifier.TaskFailed(task.ID)
 			notifier.Log(fmt.Sprintf("Task %s failed after all attempts", task.ID))
 			failureCount++
+			sessionStats.TasksFailed++
+			notifier.UsageStatsUpdate(*sessionStats)
 			session.TasksFailed = append(session.TasksFailed, task.ID)
 
 			if cfg.Execution.HaltOnFailure {
@@ -311,7 +318,8 @@ func getReadyTasksForExecution(store *storage.Storage, filter storage.Filter, ta
 
 // executeTask executes a single task with retry logic
 // Returns (success, error)
-func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.AgentRunner, task *storage.Task, model string, notifier Notifier) (bool, error) {
+// sessionStats is updated in place and UsageStatsUpdate is called after each agent call.
+func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.AgentRunner, task *storage.Task, model string, notifier Notifier, sessionStats *ui.UsageStats) (bool, error) {
 	// Mark task as in progress
 	task.Status = "in_progress"
 	task.Metadata.UpdatedAt = time.Now()
@@ -351,6 +359,12 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 		notifier.Log(fmt.Sprintf("  Running AI agent (%s)...", model))
 		agentResult, err := runner.RunWithOutput(model, prompt, logPath, notifier.AgentOutput)
 		duration := int(time.Since(startTime).Seconds())
+
+		// Update and emit usage stats after each agent call
+		sessionStats.AgentCalls++
+		sessionStats.TotalDuration += duration
+		sessionStats.LastTaskDuration = duration
+		notifier.UsageStatsUpdate(*sessionStats)
 
 		if err != nil {
 			return false, fmt.Errorf("agent execution failed: %w", err)

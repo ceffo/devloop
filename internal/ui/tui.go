@@ -96,6 +96,25 @@ type AgentOutputMsg struct {
 	Line string
 }
 
+// UsageStats holds current API usage metrics for the active agent.
+type UsageStats struct {
+	// TasksCompleted is the number of tasks successfully completed this session.
+	TasksCompleted int
+	// TasksFailed is the number of tasks that failed this session.
+	TasksFailed int
+	// TotalDuration is the total wall-clock time spent in agent calls (seconds).
+	TotalDuration int
+	// LastTaskDuration is the duration of the most recent agent call (seconds).
+	LastTaskDuration int
+	// AgentCalls is the total number of agent invocations made this session.
+	AgentCalls int
+}
+
+// UsageStatsMsg updates the usage stats footer in the TUI.
+type UsageStatsMsg struct {
+	Stats UsageStats
+}
+
 // TUIModel is the Bubble Tea model for the task list view.
 type TUIModel struct {
 	tasks       []TaskItem
@@ -117,6 +136,9 @@ type TUIModel struct {
 	// Interrupt confirmation
 	confirmingQuit bool        // whether the confirmation dialog is shown
 	cancelFunc     func()      // called to cancel executor on confirmed quit
+
+	// Usage stats footer
+	usage UsageStats
 }
 
 // NewTUIModel creates a new TUI model with the given tasks.
@@ -205,6 +227,9 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.agentName = msg.AgentName
 		m.modelID = msg.ModelID
 
+	case UsageStatsMsg:
+		m.usage = msg.Stats
+
 	case DoneMsg:
 		m.done = true
 		m.finalErr = msg.Err
@@ -250,7 +275,8 @@ func (m TUIModel) View() string {
 	}
 
 	// Calculate how many tasks we can show
-	maxTaskLines := max(m.height-6-outputPaneHeight, 5) // header (2) + footer (2) + padding (2)
+	// header (2) + footer separator (1) + usage line (1) + hint (1) + padding (1) = 6
+	maxTaskLines := max(m.height-6-outputPaneHeight, 5)
 
 	// Determine visible window around cursor for auto-scroll
 	startIdx, endIdx := visibleWindow(len(m.tasks), maxTaskLines, m.cursor)
@@ -298,14 +324,20 @@ func (m TUIModel) View() string {
 		}
 	}
 
-	// Confirmation dialog (replaces footer when active)
+	// Footer separator
 	b.WriteString(lipgloss.NewStyle().Foreground(colorGray).Render(
 		strings.Repeat("─", min(m.width, 80))) + "\n")
+
 	if m.confirmingQuit {
+		// Confirmation dialog replaces footer
 		prompt := lipgloss.NewStyle().Foreground(colorYellow).Bold(true).Render(
 			"⚠  Stop execution? Session will be saved and can be resumed. (y/n)")
 		b.WriteString(prompt)
 	} else {
+		// Usage stats line
+		usageLine := m.renderUsageStats()
+		b.WriteString(usageLine + "\n")
+		// Key hints
 		footerHint := "q: quit • ↑/↓: navigate • o: toggle output"
 		footer := lipgloss.NewStyle().Foreground(colorGray).Render(footerHint)
 		b.WriteString(footer)
@@ -350,6 +382,35 @@ func (m TUIModel) renderTaskLine(task TaskItem, selected bool) string {
 	}
 
 	return line
+}
+
+// renderUsageStats renders the usage stats line for the footer.
+func (m TUIModel) renderUsageStats() string {
+	u := m.usage
+	if u.AgentCalls == 0 && u.TasksCompleted == 0 && u.TasksFailed == 0 {
+		return lipgloss.NewStyle().Foreground(colorGray).Render("Usage: no agent calls yet")
+	}
+
+	parts := []string{}
+
+	// Task counts
+	if u.TasksCompleted > 0 || u.TasksFailed > 0 {
+		total := u.TasksCompleted + u.TasksFailed
+		parts = append(parts, fmt.Sprintf("tasks: %d/%d done", u.TasksCompleted, total))
+	}
+
+	// Agent calls
+	if u.AgentCalls > 0 {
+		parts = append(parts, fmt.Sprintf("calls: %d", u.AgentCalls))
+	}
+
+	// Duration
+	if u.TotalDuration > 0 {
+		parts = append(parts, fmt.Sprintf("time: %ds", u.TotalDuration))
+	}
+
+	line := "Usage: " + strings.Join(parts, " • ")
+	return lipgloss.NewStyle().Foreground(colorCyan).Render(line)
 }
 
 // visibleWindow calculates the start/end indices for the visible task window.
@@ -416,4 +477,9 @@ func (m TUIModel) OutputLines() []string {
 // ConfirmingQuit returns whether the quit confirmation dialog is active (for testing).
 func (m TUIModel) ConfirmingQuit() bool {
 	return m.confirmingQuit
+}
+
+// Usage returns the current usage stats (for testing).
+func (m TUIModel) Usage() UsageStats {
+	return m.usage
 }
