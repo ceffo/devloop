@@ -11,13 +11,26 @@ import (
 	"github.com/google/uuid"
 )
 
+// TaskSnapshot is a lightweight record of a task at session start
+type TaskSnapshot struct {
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	Status     string `json:"status"`
+	Complexity string `json:"complexity"`
+	Wave       int    `json:"wave"`
+}
+
 // Session represents a dev loop execution session for crash recovery
 type Session struct {
-	ID             string    `json:"id"`
-	StartedAt      time.Time `json:"started_at"`
-	LastCheckpoint string    `json:"last_checkpoint"`
-	TasksCompleted []string  `json:"tasks_completed"`
-	TasksFailed    []string  `json:"tasks_failed"`
+	ID             string         `json:"id"`
+	StartedAt      time.Time      `json:"started_at"`
+	LastCheckpoint string         `json:"last_checkpoint"`
+	TasksCompleted []string       `json:"tasks_completed"`
+	TasksFailed    []string       `json:"tasks_failed"`
+	// Metadata added for session persistence (DEV-10)
+	AgentName      string         `json:"agent_name,omitempty"`
+	ModelMap       map[string]string `json:"model_map,omitempty"` // complexity -> model
+	TaskSnapshot   []TaskSnapshot `json:"task_snapshot,omitempty"`
 }
 
 // LoadSession loads an existing session from disk or creates a new one
@@ -40,6 +53,29 @@ func LoadSession(cfg *config.Config) *Session {
 	}
 
 	return &session
+}
+
+// LoadSessionForResume loads an existing session from disk.
+// Returns the session and true if a session exists, or nil and false if not.
+func LoadSessionForResume(cfg *config.Config) (*Session, bool) {
+	sessionPath := getSessionPath(cfg)
+
+	data, err := os.ReadFile(sessionPath)
+	if err != nil {
+		return nil, false
+	}
+
+	var session Session
+	if err := json.Unmarshal(data, &session); err != nil {
+		return nil, false
+	}
+
+	// A session is only resumable if it has a checkpoint or completed tasks
+	if session.ID == "" {
+		return nil, false
+	}
+
+	return &session, true
 }
 
 // SaveSession writes the session state to disk

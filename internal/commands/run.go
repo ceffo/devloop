@@ -14,6 +14,7 @@ func RunCmd() *cobra.Command {
 		wave            int
 		taskID          string
 		continueSession bool
+		resumeSession   bool
 		dryRun          bool
 		agentName       string
 	)
@@ -56,8 +57,11 @@ Examples:
 				return fmt.Errorf("invalid configuration: %w", err)
 			}
 
+			// --resume is an alias for --continue
+			shouldResume := continueSession || resumeSession
+
 			// Execute dev loop
-			err = executor.ExecuteDevLoop(cfg, wave, taskID, continueSession, dryRun, agentName)
+			err = executor.ExecuteDevLoop(cfg, wave, taskID, shouldResume, dryRun, agentName)
 			if err != nil {
 				return err
 			}
@@ -71,6 +75,7 @@ Examples:
 	cmd.Flags().StringVar(&taskID, "task", "", "run specific task by ID")
 	cmd.Flags().StringVar(&agentName, "agent", "", "use specific agent from config (default: uses configured default)")
 	cmd.Flags().BoolVar(&continueSession, "continue", false, "resume from last checkpoint")
+	cmd.Flags().BoolVar(&resumeSession, "resume", false, "resume from last checkpoint (alias for --continue)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be executed without running")
 
 	return cmd

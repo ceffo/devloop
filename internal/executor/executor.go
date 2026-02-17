@@ -14,6 +14,7 @@ import (
 	"github.com/ceffo/devloop/internal/prompts"
 	"github.com/ceffo/devloop/internal/storage"
 	"github.com/ceffo/devloop/internal/ui"
+	"github.com/google/uuid"
 )
 
 // ExecuteDevLoop runs the main dev loop execution engine
@@ -46,17 +47,13 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 	// Load or create session
 	session := LoadSession(cfg)
 	if !continueSession {
-		// Start fresh session
-		session = LoadSession(cfg)
-		if session.LastCheckpoint != "" {
-			// Reset session for new run
-			session = &Session{
-				ID:             session.ID,
-				StartedAt:      time.Now(),
-				LastCheckpoint: "",
-				TasksCompleted: []string{},
-				TasksFailed:    []string{},
-			}
+		// Start fresh session - always create new on non-resume runs
+		session = &Session{
+			ID:             uuid.New().String(),
+			StartedAt:      time.Now(),
+			LastCheckpoint: "",
+			TasksCompleted: []string{},
+			TasksFailed:    []string{},
 		}
 	}
 
@@ -98,6 +95,30 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		return fmt.Errorf("failed to get agent configuration: %w", err)
 	}
 
+	// Resolve effective agent name for display and session metadata
+	selectedAgentName := cfg.CLI.GetDefaultAgentName()
+	if agentName != "" {
+		selectedAgentName = agentName
+	}
+
+	// Populate session metadata: agent/model info and task snapshot
+	session.AgentName = selectedAgentName
+	session.ModelMap = agentConfig.Models
+	taskSnapshots := make([]TaskSnapshot, 0, len(tasks))
+	for _, t := range tasks {
+		taskSnapshots = append(taskSnapshots, TaskSnapshot{
+			ID:         t.ID,
+			Title:      t.Title,
+			Status:     t.Status,
+			Complexity: t.Complexity,
+			Wave:       t.Wave,
+		})
+	}
+	session.TaskSnapshot = taskSnapshots
+	if err := SaveSession(cfg, session); err != nil {
+		return fmt.Errorf("failed to save session metadata: %w", err)
+	}
+
 	// If dry-run mode, just print tasks and exit
 	if dryRun {
 		printDryRunSummary(tasks, agentConfig)
@@ -108,12 +129,6 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 	agentRunner, err := agent.NewAgentRunner(agentConfig.Tool)
 	if err != nil {
 		return fmt.Errorf("failed to create agent runner: %w", err)
-	}
-
-	// Display which agent is being used
-	selectedAgentName := cfg.CLI.GetDefaultAgentName()
-	if agentName != "" {
-		selectedAgentName = agentName
 	}
 
 	// Execute tasks with dynamic dependency reassessment

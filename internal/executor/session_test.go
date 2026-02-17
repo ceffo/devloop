@@ -337,6 +337,107 @@ func TestRoundTripSession(t *testing.T) {
 	}
 }
 
+func TestLoadSessionForResume_NoSession(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := &config.Config{
+		Project: config.ProjectConfig{Path: tempDir},
+	}
+
+	session, exists := LoadSessionForResume(cfg)
+	if exists {
+		t.Error("Expected no session to exist, but got one")
+	}
+	if session != nil {
+		t.Error("Expected nil session, got non-nil")
+	}
+}
+
+func TestLoadSessionForResume_ExistingSession(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := &config.Config{
+		Project: config.ProjectConfig{Path: tempDir},
+	}
+
+	// Save a session first
+	existing := &Session{
+		ID:             "resume-test-uuid",
+		StartedAt:      time.Date(2024, 3, 1, 9, 0, 0, 0, time.UTC),
+		LastCheckpoint: "DEV-5",
+		TasksCompleted: []string{"DEV-1", "DEV-2"},
+		TasksFailed:    []string{},
+		AgentName:      "claude",
+		ModelMap:       map[string]string{"simple": "haiku", "moderate": "sonnet"},
+	}
+	if err := SaveSession(cfg, existing); err != nil {
+		t.Fatalf("Failed to save session: %v", err)
+	}
+
+	session, exists := LoadSessionForResume(cfg)
+	if !exists {
+		t.Error("Expected session to exist, but got none")
+	}
+	if session == nil {
+		t.Fatal("Expected non-nil session")
+	}
+	if session.ID != existing.ID {
+		t.Errorf("Expected ID %q, got %q", existing.ID, session.ID)
+	}
+	if session.LastCheckpoint != existing.LastCheckpoint {
+		t.Errorf("Expected LastCheckpoint %q, got %q", existing.LastCheckpoint, session.LastCheckpoint)
+	}
+	if session.AgentName != existing.AgentName {
+		t.Errorf("Expected AgentName %q, got %q", existing.AgentName, session.AgentName)
+	}
+	if len(session.ModelMap) != len(existing.ModelMap) {
+		t.Errorf("Expected %d model map entries, got %d", len(existing.ModelMap), len(session.ModelMap))
+	}
+}
+
+func TestSessionMetadata(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := &config.Config{
+		Project: config.ProjectConfig{Path: tempDir},
+	}
+
+	session := &Session{
+		ID:        "meta-test",
+		StartedAt: time.Now(),
+		AgentName: "claude",
+		ModelMap: map[string]string{
+			"simple":   "claude-haiku",
+			"moderate": "claude-sonnet",
+			"complex":  "claude-opus",
+		},
+		TaskSnapshot: []TaskSnapshot{
+			{ID: "DEV-1", Title: "First task", Status: "pending", Complexity: "simple", Wave: 1},
+			{ID: "DEV-2", Title: "Second task", Status: "pending", Complexity: "moderate", Wave: 1},
+		},
+		TasksCompleted: []string{},
+		TasksFailed:    []string{},
+	}
+
+	if err := SaveSession(cfg, session); err != nil {
+		t.Fatalf("Failed to save session: %v", err)
+	}
+
+	loaded := LoadSession(cfg)
+	if loaded.AgentName != "claude" {
+		t.Errorf("Expected AgentName %q, got %q", "claude", loaded.AgentName)
+	}
+	if len(loaded.ModelMap) != 3 {
+		t.Errorf("Expected 3 model map entries, got %d", len(loaded.ModelMap))
+	}
+	if loaded.ModelMap["simple"] != "claude-haiku" {
+		t.Errorf("Expected simple model %q, got %q", "claude-haiku", loaded.ModelMap["simple"])
+	}
+	if len(loaded.TaskSnapshot) != 2 {
+		t.Errorf("Expected 2 task snapshots, got %d", len(loaded.TaskSnapshot))
+	}
+	if loaded.TaskSnapshot[0].ID != "DEV-1" {
+		t.Errorf("Expected first snapshot ID %q, got %q", "DEV-1", loaded.TaskSnapshot[0].ID)
+	}
+}
+
 func TestFilePermissions(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
