@@ -114,7 +114,7 @@ func TestExecuteTaskSuccess(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001")
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier())
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)
@@ -207,7 +207,7 @@ func TestExecuteTaskRetry(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001")
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier())
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)
@@ -297,7 +297,7 @@ func TestExecuteTaskAgentError(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001")
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier())
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)

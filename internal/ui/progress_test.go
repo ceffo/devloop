@@ -250,7 +250,7 @@ func TestTaskHeader(t *testing.T) {
 
 func TestIsTTY(t *testing.T) {
 	// Just verify the function doesn't panic
-	_ = isTTY()
+	_ = IsTTY()
 }
 
 func TestUseAnimation(t *testing.T) {

@@ -131,6 +131,10 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		return fmt.Errorf("failed to create agent runner: %w", err)
 	}
 
+	// Initialize TUI notifier (falls back to plain text for non-TTY)
+	notifier := NewNotifier()
+	notifier.Init(tasks, session.ID, selectedAgentName)
+
 	// Execute tasks with dynamic dependency reassessment
 	successCount := 0
 	failureCount := 0
@@ -141,7 +145,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		// Get next task
 		task := tasks[0]
 		tasks = tasks[1:]
-		
+
 		// Skip if already executed
 		if executedTaskIDs[task.ID] {
 			continue
@@ -152,68 +156,72 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		// Check for interrupts
 		select {
 		case <-ctx.Done():
-			fmt.Println("\n" + ui.Warning("Execution interrupted by user"))
+			notifier.Log(ui.Warning("Execution interrupted by user"))
+			notifier.Done(nil)
+			_ = notifier.Wait()
 			return printSummary(successCount, failureCount, session)
 		default:
 		}
 
-		fmt.Printf("═══════════════════════════════════════════════════════════\n")
-		fmt.Printf("Task %d: %s - %s\n", taskNumber, task.ID, task.Title)
 		// Get model for this task based on its complexity
 		model, err := agentConfig.GetModel(task.Complexity)
 		if err != nil {
-			fmt.Println(ui.Error(fmt.Sprintf("Invalid task complexity: %v", err)))
-			fmt.Println()
+			notifier.TaskFailed(task.ID)
+			notifier.Log(fmt.Sprintf("Invalid task complexity for %s: %v", task.ID, err))
 			failureCount++
 			session.TasksFailed = append(session.TasksFailed, task.ID)
 
 			// Save session state
 			CheckpointSession(session, task.ID)
 			if err := SaveSession(cfg, session); err != nil {
-				fmt.Printf("Warning: failed to save session: %v\n", err)
+				notifier.Log(fmt.Sprintf("Warning: failed to save session: %v", err))
 			}
 
 			if cfg.Execution.HaltOnFailure {
-				fmt.Println("⚠️  Halting execution due to task failure (halt_on_failure=true)")
+				notifier.Log("Halting execution due to task failure (halt_on_failure=true)")
+				notifier.Done(nil)
+				_ = notifier.Wait()
 				return printSummary(successCount, failureCount, session)
 			}
 			continue
 		}
 
-		fmt.Printf("Complexity: %s | Model: %s | Agent: %s\n", task.Complexity, model, selectedAgentName)
-		fmt.Printf("═══════════════════════════════════════════════════════════\n\n")
+		notifier.TaskStarted(task.ID, 1, task.Metadata.MaxAttempts)
+		notifier.Log(fmt.Sprintf("Task %d: %s - %s [%s/%s/%s]",
+			taskNumber, task.ID, task.Title, task.Complexity, model, selectedAgentName))
 
-		// Execute task with retries
-		success, err := executeTask(ctx, cfg, store, agentRunner, task, model)
+		// Execute task with retries, passing notifier for status updates
+		success, err := executeTask(ctx, cfg, store, agentRunner, task, model, notifier)
 		if err != nil {
-			fmt.Println(ui.Error(fmt.Sprintf("Task execution error: %v", err)))
-			fmt.Println()
+			notifier.TaskFailed(task.ID)
+			notifier.Log(fmt.Sprintf("Task %s error: %v", task.ID, err))
 			failureCount++
 			session.TasksFailed = append(session.TasksFailed, task.ID)
 
 			// Save session state
 			CheckpointSession(session, task.ID)
 			if err := SaveSession(cfg, session); err != nil {
-				fmt.Printf("Warning: failed to save session: %v\n", err)
+				notifier.Log(fmt.Sprintf("Warning: failed to save session: %v", err))
 			}
 
 			if cfg.Execution.HaltOnFailure {
-				fmt.Println("⚠️  Halting execution due to task failure (halt_on_failure=true)")
+				notifier.Log("Halting execution due to task failure (halt_on_failure=true)")
+				notifier.Done(nil)
+				_ = notifier.Wait()
 				return printSummary(successCount, failureCount, session)
 			}
 			continue
 		}
 
 		if success {
-			fmt.Println(ui.Success("Task completed successfully"))
-			fmt.Println()
+			notifier.TaskCompleted(task.ID)
 			successCount++
 			session.TasksCompleted = append(session.TasksCompleted, task.ID)
 
 			// After successful completion, check for newly-unblocked tasks
 			newlyReadyTasks, err := getReadyTasksForExecution(store, filter, taskID, false, session)
 			if err != nil {
-				fmt.Printf("Warning: failed to check for newly ready tasks: %v\n", err)
+				notifier.Log(fmt.Sprintf("Warning: failed to check for newly ready tasks: %v", err))
 			} else {
 				// Add newly ready tasks that we haven't executed yet
 				for _, newTask := range newlyReadyTasks {
@@ -228,24 +236,26 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 						}
 						if !alreadyQueued {
 							tasks = append(tasks, newTask)
-							fmt.Printf("  → Task %s is now ready (dependencies satisfied)\n", newTask.ID)
+							notifier.Log(fmt.Sprintf("Task %s is now ready (dependencies satisfied)", newTask.ID))
 						}
 					}
 				}
 			}
 		} else {
-			fmt.Println(ui.Error("Task failed after all attempts"))
-			fmt.Println()
+			notifier.TaskFailed(task.ID)
+			notifier.Log(fmt.Sprintf("Task %s failed after all attempts", task.ID))
 			failureCount++
 			session.TasksFailed = append(session.TasksFailed, task.ID)
 
 			if cfg.Execution.HaltOnFailure {
-				fmt.Println("⚠️  Halting execution due to task failure (halt_on_failure=true)")
+				notifier.Log("Halting execution due to task failure (halt_on_failure=true)")
 				// Save session state
 				CheckpointSession(session, task.ID)
 				if err := SaveSession(cfg, session); err != nil {
-					fmt.Printf("Warning: failed to save session: %v\n", err)
+					notifier.Log(fmt.Sprintf("Warning: failed to save session: %v", err))
 				}
+				notifier.Done(nil)
+				_ = notifier.Wait()
 				return printSummary(successCount, failureCount, session)
 			}
 		}
@@ -253,10 +263,12 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		// Checkpoint after each task
 		CheckpointSession(session, task.ID)
 		if err := SaveSession(cfg, session); err != nil {
-			fmt.Printf("Warning: failed to save session: %v\n", err)
+			notifier.Log(fmt.Sprintf("Warning: failed to save session: %v", err))
 		}
 	}
 
+	notifier.Done(nil)
+	_ = notifier.Wait()
 	return printSummary(successCount, failureCount, session)
 }
 
@@ -296,7 +308,7 @@ func getReadyTasksForExecution(store *storage.Storage, filter storage.Filter, ta
 
 // executeTask executes a single task with retry logic
 // Returns (success, error)
-func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.AgentRunner, task *storage.Task, model string) (bool, error) {
+func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.AgentRunner, task *storage.Task, model string, notifier Notifier) (bool, error) {
 	// Mark task as in progress
 	task.Status = "in_progress"
 	task.Metadata.UpdatedAt = time.Now()
@@ -316,7 +328,8 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 		default:
 		}
 
-		fmt.Printf("  Attempt %d/%d...\n", attemptNum, task.Metadata.MaxAttempts)
+		notifier.TaskStarted(task.ID, attemptNum, task.Metadata.MaxAttempts)
+		notifier.Log(fmt.Sprintf("  Attempt %d/%d for %s...", attemptNum, task.Metadata.MaxAttempts, task.ID))
 
 		// Generate prompt with context
 		prompt, err := prompts.RenderTaskPrompt(cfg, task, attemptNum, previousError)
@@ -332,10 +345,8 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 		// Execute agent
 		startTime := time.Now()
 
-		spinner := ui.NewSpinner(fmt.Sprintf("Running AI agent (%s)...", model))
-		spinner.Start()
+		notifier.Log(fmt.Sprintf("  Running AI agent (%s)...", model))
 		agentResult, err := runner.Run(model, prompt, logPath)
-		spinner.Stop()
 		duration := int(time.Since(startTime).Seconds())
 
 		if err != nil {
@@ -360,8 +371,7 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 			task.AddAttempt(attempt)
 			previousError = attempt.Error
 
-			fmt.Printf("  ✗ Agent execution failed: %v\n", agentResult.Error)
-			fmt.Printf("  Log: %s\n\n", logPath)
+			notifier.Log(fmt.Sprintf("  ✗ Agent execution failed: %v", agentResult.Error))
 
 			// Save task state
 			if err := store.UpdateTask(task); err != nil {
@@ -372,13 +382,11 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 			continue
 		}
 
-		fmt.Printf("  ✓ Agent execution completed (%ds)\n", duration)
+		notifier.Log(fmt.Sprintf("  ✓ Agent execution completed (%ds)", duration))
 
 		// Run verification
-		verifySpinner := ui.NewSpinner("Running verification...")
-		verifySpinner.Start()
+		notifier.Log("  Running verification...")
 		verifyResult, err := RunVerification(cfg, task.ID)
-		verifySpinner.Stop()
 		if err != nil {
 			return false, fmt.Errorf("verification execution failed: %w", err)
 		}
@@ -393,8 +401,7 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 			task.AddAttempt(attempt)
 			previousError = fmt.Sprintf("Verification failed:\n%s", verifyResult.Output)
 
-			fmt.Printf("  ✗ Verification failed (%ds)\n", verifyResult.Duration)
-			fmt.Printf("  Log: %s\n\n", verifyResult.LogPath)
+			notifier.Log(fmt.Sprintf("  ✗ Verification failed (%ds)", verifyResult.Duration))
 
 			// Save task state
 			if err := store.UpdateTask(task); err != nil {
@@ -405,7 +412,7 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 			continue
 		}
 
-		fmt.Printf("  ✓ Verification passed (%ds)\n", verifyResult.Duration)
+		notifier.Log(fmt.Sprintf("  ✓ Verification passed (%ds)", verifyResult.Duration))
 
 		// Success! Mark attempt as successful
 		attempt.Result = "passed"
@@ -415,14 +422,14 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 		// Auto-commit if enabled
 		var commitHash string
 		if cfg.Execution.AutoCommit {
-			fmt.Printf("  → Creating git commit...\n")
+			notifier.Log("  Creating git commit...")
 			hash, err := AutoCommit(cfg, task)
 			if err != nil {
 				// Commit failure shouldn't fail the task, just warn
-				fmt.Printf("  ⚠ Auto-commit failed: %v\n", err)
+				notifier.Log(fmt.Sprintf("  ⚠ Auto-commit failed: %v", err))
 			} else {
 				commitHash = hash
-				fmt.Printf("  ✓ Committed as %s\n", commitHash)
+				notifier.Log(fmt.Sprintf("  ✓ Committed as %s", commitHash))
 			}
 		}
 

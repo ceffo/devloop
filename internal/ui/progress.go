@@ -14,15 +14,15 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-// isTTY reports whether stdout is a terminal.
-func isTTY() bool {
+// IsTTY reports whether stdout is a terminal.
+func IsTTY() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 }
 
 // useAnimation reports whether animated output should be used.
 // Returns false if stdout is not a TTY or NO_COLOR is set.
 func useAnimation() bool {
-	return isTTY() && os.Getenv("NO_COLOR") == ""
+	return IsTTY() && os.Getenv("NO_COLOR") == ""
 }
 
 // Spinner wraps a blocking operation with an animated spinner.
