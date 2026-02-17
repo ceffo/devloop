@@ -30,7 +30,7 @@ vendor/
 .DS_Store
 
 # Project-specific
-.devloop/
+# .devloop/ is tracked for resilience and debugging
 *.log
 
 # Build artifacts
