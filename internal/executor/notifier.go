@@ -24,6 +24,8 @@ type Notifier interface {
 	AgentStatusUpdate(agentName, modelID string)
 	// Log emits a log message.
 	Log(msg string)
+	// AgentOutput sends a line of raw agent stdout/stderr to the output pane.
+	AgentOutput(line string)
 	// Done signals that execution is complete. Called before summary.
 	Done(err error)
 	// Wait blocks until the notifier has finished (TUI closed, etc).
@@ -106,6 +108,12 @@ func (n *tuiNotifier) Log(msg string) {
 	}
 }
 
+func (n *tuiNotifier) AgentOutput(line string) {
+	if n.program != nil {
+		n.program.Send(ui.AgentOutputMsg{Line: line})
+	}
+}
+
 func (n *tuiNotifier) Done(err error) {
 	if n.program != nil {
 		n.program.Send(ui.DoneMsg{Err: err})
@@ -146,6 +154,11 @@ func (n *plainNotifier) AgentStatusUpdate(agentName, modelID string) {
 
 func (n *plainNotifier) Log(msg string) {
 	fmt.Println(msg)
+}
+
+func (n *plainNotifier) AgentOutput(line string) {
+	// In plain mode, agent output is written to the log file only; suppress here.
+	_ = line
 }
 
 func (n *plainNotifier) Done(_ error) {}

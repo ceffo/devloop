@@ -295,6 +295,116 @@ func TestTUIModelViewWhenDone(t *testing.T) {
 	}
 }
 
+func TestTUIModelOutputPaneToggle(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Output pane starts hidden
+	if m.ShowOutput() {
+		t.Error("expected output pane to be hidden initially")
+	}
+
+	// Toggle on with 'o'
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m = updated.(TUIModel)
+	if !m.ShowOutput() {
+		t.Error("expected output pane to be visible after pressing 'o'")
+	}
+
+	// Toggle off with 'o' again
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m = updated.(TUIModel)
+	if m.ShowOutput() {
+		t.Error("expected output pane to be hidden after pressing 'o' again")
+	}
+
+	// Toggle on with Tab
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(TUIModel)
+	if !m.ShowOutput() {
+		t.Error("expected output pane to be visible after pressing Tab")
+	}
+}
+
+func TestTUIModelAgentOutputMsg(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Send some agent output lines
+	updated, _ := m.Update(AgentOutputMsg{Line: "line one"})
+	m = updated.(TUIModel)
+	updated, _ = m.Update(AgentOutputMsg{Line: "line two"})
+	m = updated.(TUIModel)
+
+	lines := m.OutputLines()
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 output lines, got %d", len(lines))
+	}
+	if lines[0] != "line one" {
+		t.Errorf("expected first line 'line one', got %q", lines[0])
+	}
+	if lines[1] != "line two" {
+		t.Errorf("expected second line 'line two', got %q", lines[1])
+	}
+}
+
+func TestTUIModelOutputPaneVisible(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+	updated0, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated0.(TUIModel)
+
+	// Add agent output
+	updated, _ := m.Update(AgentOutputMsg{Line: "agent stdout line"})
+	m = updated.(TUIModel)
+
+	// Enable output pane
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m = updated.(TUIModel)
+
+	view := m.View()
+	if !strings.Contains(view, "Agent Output") {
+		t.Error("expected 'Agent Output' header in view when pane is visible")
+	}
+	if !strings.Contains(view, "agent stdout line") {
+		t.Error("expected agent output line to appear in view when pane is visible")
+	}
+
+	// Footer should mention the toggle key
+	if !strings.Contains(view, "o: toggle output") {
+		t.Error("expected footer to show toggle key hint")
+	}
+}
+
+func TestTUIModelOutputPaneHidden(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Add agent output but keep pane hidden
+	updated, _ := m.Update(AgentOutputMsg{Line: "hidden output"})
+	m = updated.(TUIModel)
+
+	view := m.View()
+	if strings.Contains(view, "hidden output") {
+		t.Error("expected agent output to be hidden when pane is not shown")
+	}
+}
+
+func TestTUIModelOutputPaneTaskListRemains(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+	updated0, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated0.(TUIModel)
+
+	// Enable output pane
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m = updated.(TUIModel)
+
+	view := m.View()
+
+	// Task list should still be visible
+	for _, task := range sampleTasks() {
+		if !strings.Contains(view, task.ID) {
+			t.Errorf("expected task %s to remain visible when output pane is open", task.ID)
+		}
+	}
+}
+
 func TestTUIModelAgentStatusUpdate(t *testing.T) {
 	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
 

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ceffo/devloop/internal/agent"
 	"github.com/ceffo/devloop/internal/config"
 	"github.com/ceffo/devloop/internal/storage"
 )
@@ -19,12 +20,20 @@ type mockAgentRunner struct {
 }
 
 func (m *mockAgentRunner) Run(model, prompt, logPath string) (*AgentResult, error) {
+	return m.RunWithOutput(model, prompt, logPath, nil)
+}
+
+func (m *mockAgentRunner) RunWithOutput(model, prompt, logPath string, outputFn agent.OutputCallback) (*AgentResult, error) {
 	// Create log directory and file
 	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
 		return nil, err
 	}
 	if err := os.WriteFile(logPath, []byte("Mock agent output"), 0644); err != nil {
 		return nil, err
+	}
+
+	if outputFn != nil {
+		outputFn("Mock agent output")
 	}
 
 	result := &AgentResult{

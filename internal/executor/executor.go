@@ -348,7 +348,7 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 		startTime := time.Now()
 
 		notifier.Log(fmt.Sprintf("  Running AI agent (%s)...", model))
-		agentResult, err := runner.Run(model, prompt, logPath)
+		agentResult, err := runner.RunWithOutput(model, prompt, logPath, notifier.AgentOutput)
 		duration := int(time.Since(startTime).Seconds())
 
 		if err != nil {

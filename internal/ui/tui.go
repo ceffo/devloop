@@ -91,6 +91,11 @@ type AgentStatusMsg struct {
 	ModelID   string
 }
 
+// AgentOutputMsg appends a line of agent stdout/stderr to the output pane.
+type AgentOutputMsg struct {
+	Line string
+}
+
 // TUIModel is the Bubble Tea model for the task list view.
 type TUIModel struct {
 	tasks       []TaskItem
@@ -104,6 +109,10 @@ type TUIModel struct {
 	sessionID   string
 	agentName   string
 	modelID     string // currently active model
+
+	// Agent output pane
+	showOutput  bool     // whether the output pane is visible
+	outputLines []string // streaming agent stdout/stderr lines
 }
 
 // NewTUIModel creates a new TUI model with the given tasks.
@@ -141,6 +150,8 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.tasks)-1 {
 				m.cursor++
 			}
+		case "o", "tab":
+			m.showOutput = !m.showOutput
 		}
 
 	case tea.WindowSizeMsg:
@@ -162,6 +173,9 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case LogMsg:
 		m.logs = append(m.logs, msg.Line)
+
+	case AgentOutputMsg:
+		m.outputLines = append(m.outputLines, msg.Line)
 
 	case AgentStatusMsg:
 		m.agentName = msg.AgentName
@@ -205,8 +219,14 @@ func (m TUIModel) View() string {
 	b.WriteString(lipgloss.NewStyle().Foreground(colorGray).Render(
 		strings.Repeat("─", min(m.width, 80))) + "\n")
 
+	// Reserve space for output pane when visible
+	outputPaneHeight := 0
+	if m.showOutput {
+		outputPaneHeight = max(m.height/3, 5)
+	}
+
 	// Calculate how many tasks we can show
-	maxTaskLines := max(m.height-6, 5) // header (2) + footer (2) + padding (2)
+	maxTaskLines := max(m.height-6-outputPaneHeight, 5) // header (2) + footer (2) + padding (2)
 
 	// Determine visible window around cursor for auto-scroll
 	startIdx, endIdx := visibleWindow(len(m.tasks), maxTaskLines, m.cursor)
@@ -236,10 +256,29 @@ func (m TUIModel) View() string {
 		}
 	}
 
+	// Agent output pane
+	if m.showOutput {
+		b.WriteString(lipgloss.NewStyle().Foreground(colorCyan).Render(
+			strings.Repeat("─", min(m.width, 80))) + "\n")
+		paneTitle := lipgloss.NewStyle().Foreground(colorCyan).Bold(true).Render("Agent Output")
+		b.WriteString(paneTitle + "\n")
+
+		// Show the last outputPaneHeight-2 lines (title + separator take 2 lines)
+		visibleLines := max(outputPaneHeight-2, 1)
+		lineStart := max(len(m.outputLines)-visibleLines, 0)
+		for _, line := range m.outputLines[lineStart:] {
+			b.WriteString(truncate(line, m.width-2) + "\n")
+		}
+		if len(m.outputLines) == 0 {
+			b.WriteString(lipgloss.NewStyle().Foreground(colorGray).Render("  (no output yet)") + "\n")
+		}
+	}
+
 	// Footer
 	b.WriteString(lipgloss.NewStyle().Foreground(colorGray).Render(
 		strings.Repeat("─", min(m.width, 80))) + "\n")
-	footer := lipgloss.NewStyle().Foreground(colorGray).Render("q: quit • ↑/↓: navigate")
+	footerHint := "q: quit • ↑/↓: navigate • o: toggle output"
+	footer := lipgloss.NewStyle().Foreground(colorGray).Render(footerHint)
 	b.WriteString(footer)
 
 	return b.String()
@@ -332,4 +371,14 @@ func (m TUIModel) ActiveIndex() int {
 // Done returns whether the TUI has finished (for testing).
 func (m TUIModel) Done() bool {
 	return m.done
+}
+
+// ShowOutput returns whether the output pane is currently visible (for testing).
+func (m TUIModel) ShowOutput() bool {
+	return m.showOutput
+}
+
+// OutputLines returns the accumulated agent output lines (for testing).
+func (m TUIModel) OutputLines() []string {
+	return m.outputLines
 }
