@@ -33,6 +33,11 @@ func (s *Storage) getTasksFilePath() string {
 	return filepath.Join(s.tasksDir, "tasks.jsonl")
 }
 
+// ConfigPath returns the full path to the config.json file
+func (s *Storage) ConfigPath() string {
+	return filepath.Join(s.tasksDir, "config.json")
+}
+
 // LoadTasks reads all tasks from the JSONL file
 func (s *Storage) LoadTasks() ([]*Task, error) {
 	path := s.getTasksFilePath()

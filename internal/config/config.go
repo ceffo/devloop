@@ -362,7 +362,7 @@ func applyDefaults(cfg *Config) {
 }
 
 // DeriveTaskIDPrefix generates a JIRA-style prefix from the project name
-// Examples: "devloop" -> "DEV", "my-project" -> "MYP"
+// Examples: "devloop" -> "DEV", "my-project" -> "MYP", "x" -> "X"
 func DeriveTaskIDPrefix(name string) string {
 	// Extract first letters of each word (separated by dash or space)
 	var prefix string
@@ -380,14 +380,16 @@ func DeriveTaskIDPrefix(name string) string {
 		}
 	}
 
-	// If we got a prefix, use it; otherwise use first 3 letters
-	if len(prefix) > 0 {
+	// If we got multiple letters from word extraction, use it
+	if len(prefix) > 1 {
 		return prefix
 	}
 
+	// Otherwise, use first 3 letters of the name
 	if len(name) >= 3 {
 		return strings.ToUpper(name[:3])
 	}
 
+	// If name is shorter than 3 letters, use the whole name
 	return strings.ToUpper(name)
 }
