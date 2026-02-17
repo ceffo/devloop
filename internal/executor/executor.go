@@ -187,6 +187,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		}
 
 		notifier.TaskStarted(task.ID, 1, task.Metadata.MaxAttempts)
+		notifier.AgentStatusUpdate(selectedAgentName, model)
 		notifier.Log(fmt.Sprintf("Task %d: %s - %s [%s/%s/%s]",
 			taskNumber, task.ID, task.Title, task.Complexity, model, selectedAgentName))
 
@@ -267,6 +268,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		}
 	}
 
+	notifier.AgentStatusUpdate("", "")
 	notifier.Done(nil)
 	_ = notifier.Wait()
 	return printSummary(successCount, failureCount, session)

@@ -20,6 +20,8 @@ type Notifier interface {
 	TaskCompleted(taskID string)
 	// TaskFailed signals that a task failed.
 	TaskFailed(taskID string)
+	// AgentStatusUpdate updates the active agent and model information.
+	AgentStatusUpdate(agentName, modelID string)
 	// Log emits a log message.
 	Log(msg string)
 	// Done signals that execution is complete. Called before summary.
@@ -89,6 +91,15 @@ func (n *tuiNotifier) TaskFailed(taskID string) {
 	}
 }
 
+func (n *tuiNotifier) AgentStatusUpdate(agentName, modelID string) {
+	if n.program != nil {
+		n.program.Send(ui.AgentStatusMsg{
+			AgentName: agentName,
+			ModelID:   modelID,
+		})
+	}
+}
+
 func (n *tuiNotifier) Log(msg string) {
 	if n.program != nil {
 		n.program.Send(ui.LogMsg{Line: msg})
@@ -127,6 +138,10 @@ func (n *plainNotifier) TaskCompleted(taskID string) {
 
 func (n *plainNotifier) TaskFailed(taskID string) {
 	ui.PlainTaskUpdate(taskID, ui.StatusFailed, 0)
+}
+
+func (n *plainNotifier) AgentStatusUpdate(agentName, modelID string) {
+	// Plain notifier doesn't need to update anything since status is shown inline
 }
 
 func (n *plainNotifier) Log(msg string) {

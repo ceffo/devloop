@@ -85,6 +85,12 @@ type DoneMsg struct {
 	Err error
 }
 
+// AgentStatusMsg updates the active agent and model in the TUI header.
+type AgentStatusMsg struct {
+	AgentName string
+	ModelID   string
+}
+
 // TUIModel is the Bubble Tea model for the task list view.
 type TUIModel struct {
 	tasks       []TaskItem
@@ -97,6 +103,7 @@ type TUIModel struct {
 	finalErr    error
 	sessionID   string
 	agentName   string
+	modelID     string // currently active model
 }
 
 // NewTUIModel creates a new TUI model with the given tasks.
@@ -156,6 +163,10 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case LogMsg:
 		m.logs = append(m.logs, msg.Line)
 
+	case AgentStatusMsg:
+		m.agentName = msg.AgentName
+		m.modelID = msg.ModelID
+
 	case DoneMsg:
 		m.done = true
 		m.finalErr = msg.Err
@@ -179,8 +190,17 @@ func (m TUIModel) View() string {
 		Foreground(colorCyan).
 		Padding(0, 1)
 	header := headerStyle.Render("devloop")
+
+	// Build status info - show agent/model or idle
+	statusInfo := "Idle"
+	if m.modelID != "" {
+		statusInfo = fmt.Sprintf("Agent: %s | Model: %s", m.agentName, m.modelID)
+	} else if m.agentName != "" {
+		statusInfo = fmt.Sprintf("Agent: %s", m.agentName)
+	}
+
 	sessionInfo := lipgloss.NewStyle().Foreground(colorGray).Render(
-		fmt.Sprintf(" session:%s agent:%s", truncate(m.sessionID, 8), m.agentName))
+		fmt.Sprintf(" session:%s | %s", truncate(m.sessionID, 8), statusInfo))
 	b.WriteString(header + sessionInfo + "\n")
 	b.WriteString(lipgloss.NewStyle().Foreground(colorGray).Render(
 		strings.Repeat("─", min(m.width, 80))) + "\n")

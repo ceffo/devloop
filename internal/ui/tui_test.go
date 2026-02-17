@@ -294,3 +294,34 @@ func TestTUIModelViewWhenDone(t *testing.T) {
 		t.Errorf("expected empty view when done, got %q", view)
 	}
 }
+
+func TestTUIModelAgentStatusUpdate(t *testing.T) {
+	m := NewTUIModel(sampleTasks(), "sess-123", "claude")
+
+	// Update with agent and model
+	updated, _ := m.Update(AgentStatusMsg{
+		AgentName: "claude",
+		ModelID:   "opus-4",
+	})
+	m = updated.(TUIModel)
+
+	view := m.View()
+	if !strings.Contains(view, "Agent: claude") {
+		t.Error("expected view to contain agent name after update")
+	}
+	if !strings.Contains(view, "Model: opus-4") {
+		t.Error("expected view to contain model ID after update")
+	}
+
+	// Update to idle (empty agent/model)
+	updated, _ = m.Update(AgentStatusMsg{
+		AgentName: "",
+		ModelID:   "",
+	})
+	m = updated.(TUIModel)
+
+	view = m.View()
+	if !strings.Contains(view, "Idle") {
+		t.Error("expected view to show Idle when agent/model are empty")
+	}
+}
