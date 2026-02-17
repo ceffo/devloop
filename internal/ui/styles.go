@@ -197,3 +197,23 @@ func TableCell(text string) string {
 func Separator() string {
 	return "═══════════════════════════════════════════════════════════"
 }
+
+// StatusIconStr returns a plain-text icon for the given status string.
+func StatusIconStr(status string) string {
+	switch status {
+	case "completed":
+		return "✓"
+	case "in_progress":
+		return "▶"
+	case "failed":
+		return "✗"
+	case "blocked":
+		return "⊘"
+	case "pending":
+		return "○"
+	case "archived":
+		return "▪"
+	default:
+		return "○"
+	}
+}

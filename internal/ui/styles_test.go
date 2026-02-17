@@ -228,6 +228,30 @@ func TestNO_COLOR(t *testing.T) {
 	}
 }
 
+func TestStatusIconStr(t *testing.T) {
+	tests := []struct {
+		status   string
+		expected string
+	}{
+		{"completed", "✓"},
+		{"in_progress", "▶"},
+		{"failed", "✗"},
+		{"blocked", "⊘"},
+		{"pending", "○"},
+		{"archived", "▪"},
+		{"unknown", "○"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.status, func(t *testing.T) {
+			result := StatusIconStr(tt.status)
+			if result != tt.expected {
+				t.Errorf("StatusIconStr(%q) = %q, want %q", tt.status, result, tt.expected)
+			}
+		})
+	}
+}
+
 // Helper to re-initialize colors (for testing)
 func initializeColors() {
 	baseStyle = baseStyle.Copy()

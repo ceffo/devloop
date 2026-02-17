@@ -9,6 +9,7 @@ import (
 	"github.com/ceffo/devloop/internal/config"
 	"github.com/ceffo/devloop/internal/storage"
 	"github.com/ceffo/devloop/internal/ui"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -123,13 +124,31 @@ Examples:
 	return cmd
 }
 
-// displayTasksTable renders tasks in a formatted table
+// displayTasksTable renders tasks in a formatted table.
+// When stdout is not a TTY (piped/redirected), falls back to plain text.
 func displayTasksTable(tasks []*storage.Task) {
-	table := ui.NewTable("ID", "Title", "Status", "Complexity", "Attempts", "Duration")
+	if !ui.IsTTY() {
+		plainTaskList(tasks)
+		return
+	}
 
-	// Add rows
+	// Styled header
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00B8D4"))
+	countStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#616161"))
+	fmt.Printf("\n%s %s\n\n",
+		headerStyle.Render("Tasks"),
+		countStyle.Render(fmt.Sprintf("(%d)", len(tasks))),
+	)
+
+	table := ui.NewTable(" ", "ID", "Title", "Status", "Complexity", "Attempts", "Duration")
+
+	// Add rows — first column is the status icon for at-a-glance scanning
 	for _, task := range tasks {
+		icon := lipgloss.NewStyle().
+			Foreground(statusIconColor(task.Status)).
+			Render(ui.StatusIconStr(task.Status))
 		table.Append(
+			icon,
 			task.ID,
 			truncateTitle(task.Title, 50),
 			ui.StatusBadge(task.Status),
@@ -139,8 +158,66 @@ func displayTasksTable(tasks []*storage.Task) {
 		)
 	}
 
-	// Render the table
 	fmt.Print(table.Render())
+
+	// Summary line
+	fmt.Println()
+	fmt.Println(taskSummary(tasks))
+	fmt.Println()
+}
+
+// statusIconColor returns the lipgloss color for a given status string.
+func statusIconColor(status string) lipgloss.Color {
+	switch status {
+	case "completed":
+		return lipgloss.Color("#00C853")
+	case "in_progress":
+		return lipgloss.Color("#FFD600")
+	case "failed":
+		return lipgloss.Color("#D50000")
+	case "blocked":
+		return lipgloss.Color("#AA00FF")
+	case "archived":
+		return lipgloss.Color("#616161")
+	default:
+		return lipgloss.Color("#616161")
+	}
+}
+
+// taskSummary returns a one-line summary of task counts by status.
+func taskSummary(tasks []*storage.Task) string {
+	counts := map[string]int{}
+	for _, t := range tasks {
+		counts[t.Status]++
+	}
+
+	var parts []string
+	order := []string{"completed", "in_progress", "pending", "failed", "blocked", "archived"}
+	for _, s := range order {
+		if n := counts[s]; n > 0 {
+			icon := lipgloss.NewStyle().
+				Foreground(statusIconColor(s)).
+				Render(ui.StatusIconStr(s))
+			parts = append(parts, fmt.Sprintf("%s %s: %d", icon, s, n))
+		}
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, "  ")
+}
+
+// plainTaskList outputs tasks as plain text (non-TTY fallback).
+func plainTaskList(tasks []*storage.Task) {
+	for _, task := range tasks {
+		fmt.Printf("%s %s  %s  %s\n",
+			ui.StatusIconStr(task.Status),
+			task.ID,
+			task.Status,
+			task.Title,
+		)
+	}
 }
 
 // formatStatus returns a color-coded status string
