@@ -79,33 +79,10 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		filter.Wave = wave
 	}
 
-	// Query all pending tasks
-	allPendingTasks, err := store.QueryTasks(filter)
+	// Build initial task list
+	tasks, err := getReadyTasksForExecution(store, filter, taskID, continueSession, session)
 	if err != nil {
-		return fmt.Errorf("failed to query tasks: %w", err)
-	}
-
-	// Filter to only tasks whose dependencies are completed
-	tasks, err := filterReadyTasks(store, allPendingTasks)
-	if err != nil {
-		return fmt.Errorf("failed to filter ready tasks: %w", err)
-	}
-
-	// Filter specific task if requested
-	if taskID != "" {
-		var filteredTasks []*storage.Task
-		for _, task := range tasks {
-			if task.ID == taskID {
-				filteredTasks = []*storage.Task{task}
-				break
-			}
-		}
-		tasks = filteredTasks
-	}
-
-	// Handle resume from checkpoint
-	if continueSession && session.LastCheckpoint != "" {
-		tasks = filterTasksAfterCheckpoint(tasks, session.LastCheckpoint)
+		return err
 	}
 
 	if len(tasks) == 0 {
@@ -113,7 +90,7 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		return nil
 	}
 
-	fmt.Printf("Found %d task(s) to execute\n\n", len(tasks))
+	fmt.Printf("Found %d task(s) ready to execute\n\n", len(tasks))
 
 	// Get agent config
 	agentConfig, err := cfg.CLI.GetAgent(agentName)
@@ -139,12 +116,24 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		selectedAgentName = agentName
 	}
 
-	// Execute tasks
+	// Execute tasks with dynamic dependency reassessment
 	successCount := 0
 	failureCount := 0
-	taskProgress := ui.NewTaskProgress(len(tasks))
+	executedTaskIDs := make(map[string]bool) // Track what we've already executed
+	taskNumber := 0
 
-	for i, task := range tasks {
+	for len(tasks) > 0 {
+		// Get next task
+		task := tasks[0]
+		tasks = tasks[1:]
+		
+		// Skip if already executed
+		if executedTaskIDs[task.ID] {
+			continue
+		}
+		executedTaskIDs[task.ID] = true
+		taskNumber++
+
 		// Check for interrupts
 		select {
 		case <-ctx.Done():
@@ -153,10 +142,8 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		default:
 		}
 
-		taskProgress.Update(i+1, fmt.Sprintf("%s - %s", task.ID, task.Title))
-
 		fmt.Printf("═══════════════════════════════════════════════════════════\n")
-		fmt.Printf("Task %d/%d: %s - %s\n", i+1, len(tasks), task.ID, task.Title)
+		fmt.Printf("Task %d: %s - %s\n", taskNumber, task.ID, task.Title)
 		// Get model for this task based on its complexity
 		model, err := agentConfig.GetModel(task.Complexity)
 		if err != nil {
@@ -207,6 +194,30 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 			fmt.Println()
 			successCount++
 			session.TasksCompleted = append(session.TasksCompleted, task.ID)
+
+			// After successful completion, check for newly-unblocked tasks
+			newlyReadyTasks, err := getReadyTasksForExecution(store, filter, taskID, false, session)
+			if err != nil {
+				fmt.Printf("Warning: failed to check for newly ready tasks: %v\n", err)
+			} else {
+				// Add newly ready tasks that we haven't executed yet
+				for _, newTask := range newlyReadyTasks {
+					if !executedTaskIDs[newTask.ID] {
+						// Check if already in queue
+						alreadyQueued := false
+						for _, queuedTask := range tasks {
+							if queuedTask.ID == newTask.ID {
+								alreadyQueued = true
+								break
+							}
+						}
+						if !alreadyQueued {
+							tasks = append(tasks, newTask)
+							fmt.Printf("  → Task %s is now ready (dependencies satisfied)\n", newTask.ID)
+						}
+					}
+				}
+			}
 		} else {
 			fmt.Println(ui.Error("Task failed after all attempts"))
 			fmt.Println()
@@ -231,8 +242,41 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 		}
 	}
 
-	taskProgress.Complete()
 	return printSummary(successCount, failureCount, session)
+}
+
+// getReadyTasksForExecution returns the list of tasks ready to execute based on filters
+func getReadyTasksForExecution(store *storage.Storage, filter storage.Filter, taskID string, continueSession bool, session *Session) ([]*storage.Task, error) {
+	// Query all pending tasks
+	allPendingTasks, err := store.QueryTasks(filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tasks: %w", err)
+	}
+
+	// Filter to only tasks whose dependencies are completed
+	tasks, err := filterReadyTasks(store, allPendingTasks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter ready tasks: %w", err)
+	}
+
+	// Filter specific task if requested
+	if taskID != "" {
+		var filteredTasks []*storage.Task
+		for _, task := range tasks {
+			if task.ID == taskID {
+				filteredTasks = []*storage.Task{task}
+				break
+			}
+		}
+		tasks = filteredTasks
+	}
+
+	// Handle resume from checkpoint
+	if continueSession && session.LastCheckpoint != "" {
+		tasks = filterTasksAfterCheckpoint(tasks, session.LastCheckpoint)
+	}
+
+	return tasks, nil
 }
 
 // executeTask executes a single task with retry logic
