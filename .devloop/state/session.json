@@ -1,7 +1,29 @@
 {
-  "id": "30333790-3c3f-424a-9230-ce538cee3e08",
-  "started_at": "2026-02-17T15:41:42.987760146-05:00",
+  "id": "356e820f-b4cb-41fc-9dc2-eb37fb11f248",
+  "started_at": "2026-02-17T15:48:42.952924913-05:00",
   "last_checkpoint": "",
   "tasks_completed": [],
-  "tasks_failed": []
+  "tasks_failed": [],
+  "agent_name": "claude",
+  "model_map": {
+    "complex": "claude-opus-4-6",
+    "moderate": "claude-sonnet-4-5-20250929",
+    "simple": "claude-haiku-4-5-20251001"
+  },
+  "task_snapshot": [
+    {
+      "id": "DEV-16",
+      "title": "Simplify CLI usage output text",
+      "status": "pending",
+      "complexity": "simple",
+      "wave": 1
+    },
+    {
+      "id": "DEV-18",
+      "title": "Style task list output with charmbracelet widgets",
+      "status": "pending",
+      "complexity": "moderate",
+      "wave": 1
+    }
+  ]
 }
