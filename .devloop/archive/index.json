@@ -2,13 +2,13 @@
   "waves": [
     {
       "wave": 2,
-      "archived_at": "2026-02-16T14:55:58.029052219-05:00",
-      "task_count": 4,
+      "archived_at": "2026-02-16T21:23:04.290621973-05:00",
+      "task_count": 1,
       "archive_path": "/home/moncef/code/devloop/.devloop/archive/wave-2.jsonl"
     },
     {
       "wave": 1,
-      "archived_at": "2026-02-16T14:57:25.050268137-05:00",
+      "archived_at": "2026-02-16T21:23:04.289743867-05:00",
       "task_count": 4,
       "archive_path": "/home/moncef/code/devloop/.devloop/archive/wave-1.jsonl"
     }
