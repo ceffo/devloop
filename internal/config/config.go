@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // Config represents the complete devloop configuration
@@ -22,10 +23,12 @@ type Config struct {
 
 // ProjectConfig holds project-specific metadata
 type ProjectConfig struct {
-	Name       string `json:"name"`
-	Path       string `json:"path"`
-	TechStack  string `json:"tech_stack"`
-	MainBranch string `json:"main_branch"`
+	Name          string `json:"name"`
+	Path          string `json:"path"`
+	TechStack     string `json:"tech_stack"`
+	MainBranch    string `json:"main_branch"`
+	TaskIDPrefix  string `json:"task_id_prefix,omitempty"`  // e.g., "DEV", "WORK"
+	TaskIDFormat  string `json:"task_id_format,omitempty"`  // "hierarchical" or "jira"
 }
 
 // VerificationConfig defines how to verify task completion
@@ -244,10 +247,12 @@ func getDefaultConfig() *Config {
 	return &Config{
 		Version: "1.0",
 		Project: ProjectConfig{
-			Name:       "",
-			Path:       "",
-			TechStack:  "",
-			MainBranch: "main",
+			Name:         "",
+			Path:         "",
+			TechStack:    "",
+			MainBranch:   "main",
+			TaskIDPrefix: "",     // Will be derived from project name
+			TaskIDFormat: "jira", // Default to JIRA format for new projects
 		},
 		Verification: VerificationConfig{
 			Command:        "",
@@ -305,6 +310,16 @@ func applyDefaults(cfg *Config) {
 		cfg.Project.MainBranch = defaults.Project.MainBranch
 	}
 
+	// Set task ID format defaults
+	if cfg.Project.TaskIDFormat == "" {
+		cfg.Project.TaskIDFormat = defaults.Project.TaskIDFormat
+	}
+
+	// Derive task ID prefix from project name if not set
+	if cfg.Project.TaskIDPrefix == "" && cfg.Project.Name != "" {
+		cfg.Project.TaskIDPrefix = DeriveTaskIDPrefix(cfg.Project.Name)
+	}
+
 	if cfg.Verification.TimeoutSeconds <= 0 {
 		cfg.Verification.TimeoutSeconds = defaults.Verification.TimeoutSeconds
 	}
@@ -344,4 +359,35 @@ func applyDefaults(cfg *Config) {
 	if cfg.Files.Todo == "" {
 		cfg.Files.Todo = defaults.Files.Todo
 	}
+}
+
+// DeriveTaskIDPrefix generates a JIRA-style prefix from the project name
+// Examples: "devloop" -> "DEV", "my-project" -> "MYP"
+func DeriveTaskIDPrefix(name string) string {
+	// Extract first letters of each word (separated by dash or space)
+	var prefix string
+	capNext := true
+
+	for _, ch := range name {
+		if ch == '-' || ch == '_' || ch == ' ' {
+			capNext = true
+			continue
+		}
+
+		if capNext {
+			prefix += strings.ToUpper(string(ch))
+			capNext = false
+		}
+	}
+
+	// If we got a prefix, use it; otherwise use first 3 letters
+	if len(prefix) > 0 {
+		return prefix
+	}
+
+	if len(name) >= 3 {
+		return strings.ToUpper(name[:3])
+	}
+
+	return strings.ToUpper(name)
 }

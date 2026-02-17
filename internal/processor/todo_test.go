@@ -322,7 +322,8 @@ func TestGenerateNextTaskID(t *testing.T) {
 			tmpDir := t.TempDir()
 			cfg := &config.Config{
 				Project: config.ProjectConfig{
-					Path: tmpDir,
+					Path:         tmpDir,
+					TaskIDFormat: "hierarchical", // Test hierarchical format
 				},
 			}
 			store := storage.NewStorage(cfg)
@@ -335,7 +336,7 @@ func TestGenerateNextTaskID(t *testing.T) {
 			}
 
 			// Generate next ID
-			got, err := generateNextTaskID(store)
+			got, err := generateNextTaskID(store, cfg)
 			if err != nil {
 				t.Fatalf("generateNextTaskID() error = %v", err)
 			}

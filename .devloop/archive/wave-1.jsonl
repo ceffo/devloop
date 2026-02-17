@@ -1,0 +1,4 @@
+{"task_id":"1.1","title":"Define archive data structures","status":"completed","completed_at":"2026-02-16T11:35:49.170906977-05:00","wave":1}
+{"task_id":"1.2","title":"Implement JSONL archive export","status":"completed","completed_at":"2026-02-16T14:37:56.978001296-05:00","wave":1}
+{"task_id":"1.3","title":"Generate markdown archive summaries","status":"completed","completed_at":"2026-02-16T14:52:07.164611362-05:00","wave":1}
+{"task_id":"1.4","title":"Implement archive CLI command","status":"completed","completed_at":"2026-02-16T14:56:32.265075449-05:00","wave":1}

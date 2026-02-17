@@ -220,7 +220,7 @@ func ProcessTodoItems(cfg *config.Config, todos []TodoItem, review bool) ([]*sto
 	store := storage.NewStorage(cfg)
 
 	// Generate next available task ID
-	nextID, err := generateNextTaskID(store)
+	nextID, err := generateNextTaskID(store, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate next task ID: %w", err)
 	}
@@ -273,16 +273,44 @@ func ProcessTodoItems(cfg *config.Config, todos []TodoItem, review bool) ([]*sto
 }
 
 // generateNextTaskID queries existing tasks and returns the next available ID
-func generateNextTaskID(store *storage.Storage) (string, error) {
+// Supports both hierarchical (1.1, 2.5) and JIRA (DEV-123) formats
+func generateNextTaskID(store *storage.Storage, cfg *config.Config) (string, error) {
 	tasks, err := store.LoadTasks()
 	if err != nil {
 		return "", fmt.Errorf("failed to load tasks: %w", err)
 	}
 
+	format := cfg.Project.TaskIDFormat
+	if format == "" {
+		// Auto-detect from existing tasks, default to JIRA for new projects
+		if len(tasks) == 0 {
+			format = "jira"
+		} else {
+			format = storage.DetectIDFormat(tasks[0].ID)
+		}
+	}
+
 	if len(tasks) == 0 {
+		if format == "jira" {
+			prefix := cfg.Project.TaskIDPrefix
+			if prefix == "" {
+				prefix = config.DeriveTaskIDPrefix(cfg.Project.Name)
+			}
+			return fmt.Sprintf("%s-1", prefix), nil
+		}
 		return "1.1", nil
 	}
 
+	// Generate based on detected/configured format
+	if format == "jira" {
+		return generateNextJiraID(tasks, cfg)
+	}
+
+	return generateNextTaskIDHierarchical(tasks)
+}
+
+// generateNextTaskIDHierarchical generates the next hierarchical ID (e.g., "1.2", "2.1")
+func generateNextTaskIDHierarchical(tasks []*storage.Task) (string, error) {
 	// Find the maximum task ID
 	maxWave := 0
 	maxTaskInWave := 0
@@ -314,6 +342,28 @@ func generateNextTaskID(store *storage.Storage) (string, error) {
 	// Return next task ID in the same wave
 	nextTaskNum := maxTaskInWave + 1
 	return fmt.Sprintf("%d.%d", maxWave, nextTaskNum), nil
+}
+
+// generateNextJiraID generates the next JIRA ID (e.g., "DEV-124")
+func generateNextJiraID(tasks []*storage.Task, cfg *config.Config) (string, error) {
+	prefix := cfg.Project.TaskIDPrefix
+	if prefix == "" {
+		prefix = config.DeriveTaskIDPrefix(cfg.Project.Name)
+	}
+
+	maxNum := 0
+	prefixPattern := prefix + "-"
+
+	for _, task := range tasks {
+		if strings.HasPrefix(task.ID, prefixPattern) {
+			numStr := strings.TrimPrefix(task.ID, prefixPattern)
+			if num, err := strconv.Atoi(numStr); err == nil && num > maxNum {
+				maxNum = num
+			}
+		}
+	}
+
+	return fmt.Sprintf("%s-%d", prefix, maxNum+1), nil
 }
 
 // parseTasksFromJSON extracts tasks from the AI agent's JSON output
@@ -399,19 +449,21 @@ func parseTasksFromJSON(output string, cfg *config.Config, todos []TodoItem) ([]
 	return tasks, nil
 }
 
-// extractWaveFromID extracts the wave number from a task ID (e.g., "1.1" -> 1)
+// extractWaveFromID extracts the wave number from a task ID
+// For hierarchical IDs (e.g., "1.1" -> 1), extracts the wave number
+// For JIRA IDs (e.g., "DEV-123") or invalid IDs, returns 1 (default)
 func extractWaveFromID(id string) int {
+	// Check if it's a hierarchical ID
 	parts := strings.Split(id, ".")
-	if len(parts) != 2 {
-		return 1
+	if len(parts) >= 2 {
+		if wave, err := strconv.Atoi(parts[0]); err == nil {
+			return wave
+		}
 	}
 
-	wave, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return 1
-	}
-
-	return wave
+	// JIRA IDs and invalid IDs default to wave 1
+	// The wave field should be stored separately in the Task struct
+	return 1
 }
 
 // confirmTasks displays tasks and prompts user for confirmation

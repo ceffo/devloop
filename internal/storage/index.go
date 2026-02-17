@@ -1,10 +1,5 @@
 package storage
 
-import (
-	"strconv"
-	"strings"
-)
-
 // Filter defines optional criteria for querying tasks
 type Filter struct {
 	// Status filters tasks by status (e.g., "pending", "completed")
@@ -97,37 +92,8 @@ func (t *Task) matchesFilter(f Filter) bool {
 }
 
 // compareTaskIDs compares two task IDs for sorting
-// Task IDs are hierarchical (e.g., "1.1", "1.2", "2.1")
-// We split by "." and compare numerically
+// Supports both hierarchical (e.g., "1.1", "1.2", "2.1") and JIRA (e.g., "DEV-1", "DEV-15") IDs
+// Returns true if id1 should come before id2
 func compareTaskIDs(id1, id2 string) bool {
-	parts1 := strings.Split(id1, ".")
-	parts2 := strings.Split(id2, ".")
-
-	// Compare each part numerically
-	minLen := len(parts1)
-	if len(parts2) < minLen {
-		minLen = len(parts2)
-	}
-
-	for i := 0; i < minLen; i++ {
-		// Parse as integers for proper numeric comparison
-		n1, err1 := strconv.Atoi(parts1[i])
-		if err1 != nil {
-			n1 = 0
-		}
-		n2, err2 := strconv.Atoi(parts2[i])
-		if err2 != nil {
-			n2 = 0
-		}
-
-		if n1 < n2 {
-			return true
-		}
-		if n1 > n2 {
-			return false
-		}
-	}
-
-	// If all parts are equal, shorter ID comes first
-	return len(parts1) < len(parts2)
+	return CompareTaskIDsUniversal(id1, id2)
 }

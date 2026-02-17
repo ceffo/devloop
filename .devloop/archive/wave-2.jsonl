@@ -1,0 +1,4 @@
+{"task_id":"2.1","title":"Design CLI visual system with lipgloss","status":"completed","completed_at":"2026-02-16T11:41:26.922156012-05:00","wave":2}
+{"task_id":"2.2","title":"Add styled tables and task display","status":"completed","completed_at":"2026-02-16T14:41:45.172345954-05:00","wave":2}
+{"task_id":"2.3","title":"Add interactive progress and spinners with bubbletea","status":"completed","completed_at":"2026-02-16T14:46:37.599689147-05:00","wave":2}
+{"task_id":"2.4","title":"Add markdown rendering with glamour","status":"completed","completed_at":"2026-02-16T14:49:36.554999501-05:00","wave":2}
