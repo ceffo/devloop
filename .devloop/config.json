@@ -13,14 +13,13 @@
     "timeout_seconds": 300
   },
   "cli": {
-    "default_agent": "claude",
     "agents": {
       "claude": {
         "tool": "claude",
         "models": {
-          "complex": "opus",
-          "moderate": "sonnet",
-          "simple": "haiku"
+          "complex": "claude-opus-4.6",
+          "moderate": "claude-sonnet-4.5",
+          "simple": "claude-haiku-4.5"
         }
       },
       "copilot": {
@@ -31,12 +30,6 @@
           "simple": "claude-haiku-4.5"
         }
       }
-    },
-    "tool": "claude",
-    "models": {
-      "complex": "claude-opus-4-6",
-      "moderate": "claude-sonnet-4-5-20250929",
-      "simple": "claude-haiku-4-5-20251001"
     }
   },
   "execution": {
