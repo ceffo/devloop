@@ -7,6 +7,18 @@ import (
 	"testing"
 )
 
+// useMockModelsFetcher replaces the package-level modelsFetcher with one that
+// returns the given model set for any binary.  The original fetcher is restored
+// automatically via t.Cleanup.
+func useMockModelsFetcher(t *testing.T, models map[string]bool) {
+	t.Helper()
+	orig := modelsFetcher
+	modelsFetcher = func(_ string) (map[string]bool, error) {
+		return models, nil
+	}
+	t.Cleanup(func() { modelsFetcher = orig })
+}
+
 func TestValidate_ValidConfig(t *testing.T) {
 	// Create a temporary directory to use as project path
 	tmpDir := t.TempDir()
@@ -134,6 +146,13 @@ func TestValidate_NegativeTimeout(t *testing.T) {
 func TestValidate_InvalidModelName(t *testing.T) {
 	tmpDir := t.TempDir()
 
+	// Inject a known model set so the validator has something to check against.
+	useMockModelsFetcher(t, map[string]bool{
+		"claude-haiku-4-5-20251001":  true,
+		"claude-sonnet-4-5-20250929": true,
+		"claude-opus-4-6":            true,
+	})
+
 	cfg := getDefaultConfig()
 	cfg.Project.Path = tmpDir
 	cfg.Verification.Command = "go test"
@@ -192,6 +211,13 @@ func TestValidate_NegativeMaxAttempts(t *testing.T) {
 
 func TestValidate_AllModelsInvalid(t *testing.T) {
 	tmpDir := t.TempDir()
+
+	// Inject a known model set so the validator has something to check against.
+	useMockModelsFetcher(t, map[string]bool{
+		"claude-haiku-4-5-20251001":  true,
+		"claude-sonnet-4-5-20250929": true,
+		"claude-opus-4-6":            true,
+	})
 
 	cfg := getDefaultConfig()
 	cfg.Project.Path = tmpDir
@@ -282,6 +308,16 @@ func TestValidate_RealProjectDirectory(t *testing.T) {
 
 func TestValidate_MultipleAgentsValid(t *testing.T) {
 	tmpDir := t.TempDir()
+
+	// Inject a known model set covering both agents so validation is deterministic.
+	useMockModelsFetcher(t, map[string]bool{
+		"claude-haiku-4-5-20251001":  true,
+		"claude-sonnet-4-5-20250929": true,
+		"claude-opus-4-6":            true,
+		"gpt-5-mini":                 true,
+		"gpt-5.1":                    true,
+		"gpt-5.2":                    true,
+	})
 
 	cfg := &Config{
 		Project: ProjectConfig{
@@ -397,6 +433,13 @@ func TestValidate_AgentEmptyModels(t *testing.T) {
 
 func TestValidate_InvalidModelInAgent(t *testing.T) {
 	tmpDir := t.TempDir()
+
+	// Inject a known model set so the validator has something to check against.
+	useMockModelsFetcher(t, map[string]bool{
+		"claude-haiku-4-5-20251001":  true,
+		"claude-sonnet-4-5-20250929": true,
+		"claude-opus-4-6":            true,
+	})
 
 	cfg := &Config{
 		Project: ProjectConfig{

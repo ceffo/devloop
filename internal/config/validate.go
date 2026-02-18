@@ -6,31 +6,9 @@ import (
 	"os"
 )
 
-// knownModels is the list of valid model identifiers for both Claude and Copilot
-var knownModels = map[string]bool{
-	// Claude CLI models
-	"claude-haiku-4-5-20251001":  true,
-	"claude-sonnet-4-5-20250929": true,
-	"claude-opus-4-6":            true,
-	// GitHub Copilot CLI models
-	"claude-sonnet-4.5":    true,
-	"claude-haiku-4.5":     true,
-	"claude-opus-4.6":      true,
-	"claude-opus-4.6-fast": true,
-	"claude-opus-4.5":      true,
-	"claude-sonnet-4":      true,
-	"gemini-3-pro-preview": true,
-	"gpt-5.3-codex":        true,
-	"gpt-5.2-codex":        true,
-	"gpt-5.2":              true,
-	"gpt-5.1-codex-max":    true,
-	"gpt-5.1-codex":        true,
-	"gpt-5.1":              true,
-	"gpt-5":                true,
-	"gpt-5.1-codex-mini":   true,
-	"gpt-5-mini":           true,
-	"gpt-4.1":              true,
-}
+// modelsFetcher is the function used to discover valid models for a binary.
+// It is a package-level variable so tests can substitute a mock implementation.
+var modelsFetcher = FetchModels
 
 // Validate checks if the configuration is valid
 // Returns an error if any required fields are missing or invalid
@@ -70,11 +48,19 @@ func (c *Config) Validate() error {
 			}
 
 			// Check model names are valid
-			for complexity, model := range agent.Models {
-				if !knownModels[model] {
-					return fmt.Errorf("cli.agents.%s.models.%s has invalid model name: %s", agentName, complexity, model)
+			validModels, err := modelsFetcher(agent.Tool)
+			if err != nil {
+				return fmt.Errorf("cli.agents.%s: failed to query models for tool %q: %w", agentName, agent.Tool, err)
+			}
+			if validModels != nil {
+				for complexity, model := range agent.Models {
+					if !validModels[model] {
+						return fmt.Errorf("cli.agents.%s.models.%s has invalid model name: %s", agentName, complexity, model)
+					}
 				}
 			}
+			// validModels == nil means the binary was not found or does not list
+			// choices — model names are accepted as-is.
 		}
 	} else {
 		return errors.New("cli.agents must be configured")
