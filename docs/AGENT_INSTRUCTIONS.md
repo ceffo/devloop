@@ -2,6 +2,18 @@
 
 Shared guidance for AI agents (Claude, Copilot, etc.) working on the devloop project.
 
+## Before Starting Work
+
+**Read these first:**
+
+1. **`docs/DESIGN.md`** - Complete architecture and design decisions
+2. **`docs/diagrams/`** - Visual flows for:
+   - Task execution pipeline
+   - Session recovery mechanism
+   - Data flow through the system
+
+Understand the design and architecture before implementing any changes. This prevents over-engineering and ensures consistency with the system design.
+
 ## Project Overview
 
 devloop is a Go-based agent-driven development workflow system. It replaces bash scripts with structured, queryable, crash-safe task automation.
