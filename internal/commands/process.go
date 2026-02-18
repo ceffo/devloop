@@ -27,6 +27,7 @@ Examples:
 
 	cmd.AddCommand(processTodoCmd())
 	cmd.AddCommand(processPrdCmd())
+	cmd.AddCommand(processTasksCmd())
 
 	return cmd
 }
@@ -92,11 +93,6 @@ Examples:
 			if dryRun {
 				fmt.Printf("[dry-run] Would save %d task(s) to storage\n", len(tasks))
 				fmt.Println("[dry-run] No tasks were saved")
-				return nil
-			}
-
-			if !confirmSave(len(tasks)) {
-				fmt.Println("Task processing cancelled.")
 				return nil
 			}
 
@@ -170,8 +166,68 @@ Examples:
 				return nil
 			}
 
-			if !confirmSave(len(tasks)) {
-				fmt.Println("Task processing cancelled.")
+			store := storage.NewStorage(cfg)
+			savedCount := 0
+			for _, task := range tasks {
+				if err := store.SaveTask(task); err != nil {
+					return fmt.Errorf("failed to save task %s: %w", task.ID, err)
+				}
+				savedCount++
+			}
+
+			tasksFilePath := filepath.Join(cfg.Project.Path, ".devloop", "tasks.jsonl")
+			fmt.Printf("\n%s\n", ui.Success(fmt.Sprintf("Successfully saved %d task(s) to %s", savedCount, tasksFilePath)))
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+// processTasksCmd returns the 'process tasks' subcommand
+func processTasksCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "tasks FILE",
+		Short: "Import a TASKS.md file into task storage",
+		Long: `Parse a TASKS.md file (as produced by 'process prd') and save all tasks
+to the devloop task storage without re-running the AI agent.
+
+This is useful to recover from an interrupted 'process prd' run where the markdown
+file was already written but the save step was cancelled.
+
+Examples:
+  devloop process tasks docs/TASKS.md`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			filePath := args[0]
+
+			configPath, _ := cmd.Flags().GetString("config")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
+			cfg, err := config.LoadConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+			if err := cfg.Validate(); err != nil {
+				return fmt.Errorf("invalid configuration: %w", err)
+			}
+
+			fmt.Printf("Importing tasks from: %s\n", filePath)
+
+			tasks, err := processor.ParseTasksMarkdown(filePath, cfg)
+			if err != nil {
+				return fmt.Errorf("failed to parse tasks file: %w", err)
+			}
+
+			if len(tasks) == 0 {
+				fmt.Println("No tasks found in file.")
+				return nil
+			}
+
+			displayTasksSummary(tasks)
+
+			if dryRun {
+				fmt.Printf("[dry-run] Would save %d task(s) to storage\n", len(tasks))
+				fmt.Println("[dry-run] No tasks were saved")
 				return nil
 			}
 
@@ -185,7 +241,7 @@ Examples:
 			}
 
 			tasksFilePath := filepath.Join(cfg.Project.Path, ".devloop", "tasks.jsonl")
-			fmt.Printf("\n%s\n", ui.Success(fmt.Sprintf("Successfully saved %d task(s) to %s", savedCount, tasksFilePath)))
+			fmt.Printf("\n%s\n", ui.Success(fmt.Sprintf("Successfully imported %d task(s) to %s", savedCount, tasksFilePath)))
 			return nil
 		},
 	}
@@ -221,55 +277,10 @@ func displayTasksSummary(tasks []*storage.Task) {
 	fmt.Println()
 }
 
-// confirmSave prompts the user to confirm saving tasks
-func confirmSave(count int) bool {
-	fmt.Printf("Save %d task(s) to storage? [y/N]: ", count)
-
-	var response string
-	_, _ = fmt.Scanln(&response)
-
-	response = toLower(trim(response))
-	return response == "y" || response == "yes"
-}
-
 // truncateString truncates a string to the specified length with ellipsis
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
 	return s[:maxLen-3] + "..."
-}
-
-// toLower returns the lowercase version of a string
-func toLower(s string) string {
-	result := ""
-	for _, ch := range s {
-		if ch >= 'A' && ch <= 'Z' {
-			result += string(ch + 32)
-		} else {
-			result += string(ch)
-		}
-	}
-	return result
-}
-
-// trim removes leading and trailing whitespace from a string
-func trim(s string) string {
-	start := 0
-	end := len(s)
-
-	for start < end && isWhitespace(rune(s[start])) {
-		start++
-	}
-
-	for end > start && isWhitespace(rune(s[end-1])) {
-		end--
-	}
-
-	return s[start:end]
-}
-
-// isWhitespace checks if a rune is whitespace
-func isWhitespace(ch rune) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
 }
