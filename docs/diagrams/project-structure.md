@@ -87,7 +87,7 @@ graph TD
 - **`cmd/devloop/`**: CLI entry point with main.go
 - **`internal/`**: Core packages (not exported as library)
   - **`agent/`**: AI CLI runner abstraction (Claude, Copilot, etc.)
-  - **`archiver/`**: Archive completed waves to JSONL and markdown
+  - **`archiver/`**: Archive completed tasks to JSONL and markdown
   - **`commands/`**: Cobra command implementations
   - **`config/`**: Configuration schema, loading, and validation
   - **`executor/`**: Task execution engine with verification
@@ -112,7 +112,7 @@ Created by `devloop init`, stores per-project state:
 - **`config.json`**: Project configuration
 - **`tasks.jsonl`**: Active task storage (one JSON object per line)
 - **`logs/`**: Execution logs (agent output, verification results)
-- **`archive/`**: Archived completed waves (JSONL + markdown)
+- **`archive/`**: Archived completed tasks (JSONL + markdown)
 - **`state/`**: Session state for crash recovery
 
 ### Other Files

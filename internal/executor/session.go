@@ -17,7 +17,6 @@ type TaskSnapshot struct {
 	Title      string `json:"title"`
 	Status     string `json:"status"`
 	Complexity string `json:"complexity"`
-	Wave       int    `json:"wave"`
 }
 
 // Session represents a dev loop execution session for crash recovery

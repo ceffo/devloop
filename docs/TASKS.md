@@ -1,8 +1,8 @@
 # devloop Implementation Tasks
 
-This file tracks the implementation of the devloop system. Tasks are organized into waves corresponding to the implementation phases.
+This file tracks the implementation of the devloop system.
 
-## Wave 1: Core Infrastructure
+## Core Infrastructure
 
 ### Task 1.1: Project setup and dependencies
 
@@ -130,7 +130,6 @@ Add query capabilities for filtering tasks.
 - Create `internal/storage/index.go`
 - Implement `Filter` struct with optional fields:
   - Status string
-  - Wave int
   - Complexity string
   - Tags []string
   - BlockedBy []string (empty means not blocked)
@@ -141,13 +140,12 @@ Add query capabilities for filtering tasks.
 **Acceptance:**
 
 - Can filter by status
-- Can filter by wave
 - Can filter by complexity
 - Can filter by tags (any match)
 - Can find unblocked tasks (empty BlockedBy in filter)
 - Results sorted by ID
 
-## Wave 2: CLI Commands Foundation
+## CLI Commands Foundation
 
 ### Task 2.1: CLI framework setup
 
@@ -231,7 +229,6 @@ Create task listing with filtering options.
 - Implement `tasks list` subcommand
 - Flags:
   - `--status STATUS` - filter by status
-  - `--wave N` - filter by wave
   - `--complexity LEVEL` - filter by complexity
   - `--tags TAG1,TAG2` - filter by tags
 - Use tablewriter for formatted output
@@ -288,7 +285,7 @@ Allow manual task status updates.
 - Rejects invalid task IDs
 - Updates timestamp
 
-## Wave 3: TODO Processing System
+## TODO Processing System
 
 ### Task 3.1: TODO file parser
 
@@ -403,7 +400,6 @@ Create CLI command to process TODO files.
 - Implement `todo process FILE` subcommand
 - Flags:
   - `--review` - show tasks and confirm before saving
-  - `--wave N` - assign to specific wave (default: auto-detect next wave)
 - Load config
 - Parse TODO file
 - Call ProcessTodoItems
@@ -415,9 +411,8 @@ Create CLI command to process TODO files.
 - `devloop todo process .todo/TODO.md` works
 - Review mode shows tasks and prompts
 - Tasks are saved to JSONL
-- Wave assignment works
 
-## Wave 4: Execution Engine
+## Execution Engine
 
 ### Task 4.1: Verification runner
 
@@ -502,10 +497,10 @@ Implement the core dev loop execution engine.
 **Requirements:**
 
 - Create `internal/executor/executor.go`
-- Implement `ExecuteDevLoop(cfg *Config, wave int, taskID string, continueSession bool) error`
+- Implement `ExecuteDevLoop(cfg *Config, taskID string, continueSession bool) error`
 - Workflow:
   1. Load or resume session
-  2. Query tasks (pending, not blocked, matching wave/taskID if specified)
+  2. Query tasks (pending, not blocked, matching taskID if specified)
   3. For each task:
      - Mark in_progress
      - For each attempt (up to MaxAttempts):
@@ -542,7 +537,6 @@ Create CLI command to execute dev loop.
 - Create `internal/commands/run.go`
 - Implement `run` command
 - Flags:
-  - `--wave N` - run only tasks in wave N
   - `--task ID` - run specific task
   - `--continue` - resume from last checkpoint
 - Load config
@@ -556,11 +550,11 @@ Create CLI command to execute dev loop.
 **Acceptance:**
 
 - `devloop run` executes all pending tasks
-- Filters work (--wave, --task)
+- --task filter works
 - --continue resumes from checkpoint
 - Summary is accurate
 
-## Wave 5: Archival System
+## Archival System
 
 ### Task 5.1: Archive data structures
 
@@ -572,15 +566,14 @@ Define archive metadata structures.
 
 - Create `internal/archiver/archiver.go`
 - Define Archive struct:
-  - Wave int
   - ArchivedAt time.Time
   - TaskCount int
   - TaskIDs []string
   - OutputPath string
-- Define ArchiveIndex map[int]Archive for `.devloop/archive/index.json`
+- Define ArchiveIndex for `.devloop/archive/index.json`
 - Implement:
-  - `LoadArchiveIndex(cfg *Config) (map[int]Archive, error)`
-  - `SaveArchiveIndex(cfg *Config, index map[int]Archive) error`
+  - `LoadArchiveIndex(cfg *Config) (ArchiveIndex, error)`
+  - `SaveArchiveIndex(cfg *Config, index ArchiveIndex) error`
 
 **Acceptance:**
 
@@ -596,9 +589,8 @@ Export completed tasks to archive JSONL.
 
 **Requirements:**
 
-- Implement `ArchiveWaveToJSONL(cfg *Config, storage *storage.Storage, wave int) (string, error)`
-- Query all tasks with status=completed and wave=N
-- Write to `.devloop/archive/wave-N.jsonl`
+- Implement `ArchiveTasksToJSONL(cfg *Config, storage *storage.Storage, tasks []*Task) (string, error)`
+- Write completed tasks to `.devloop/archive/archive-TIMESTAMP.jsonl`
 - One task per line (JSONL format)
 - Return output file path
 
@@ -606,7 +598,7 @@ Export completed tasks to archive JSONL.
 
 - Exports completed tasks to JSONL
 - File format is valid JSONL
-- Handles empty wave gracefully
+- Handles empty task list gracefully
 - Returns output path
 
 ### Task 5.3: Markdown archive summary
@@ -617,9 +609,9 @@ Generate human-readable archive summaries.
 
 **Requirements:**
 
-- Implement `GenerateArchiveSummary(cfg *Config, tasks []*storage.Task, wave int) (string, error)`
+- Implement `GenerateArchiveSummary(cfg *Config, tasks []*storage.Task) (string, error)`
 - Create markdown document with:
-  - Header: "Wave N - Completed Tasks"
+  - Header: "Archived Tasks"
   - Archived timestamp
   - For each task:
     - Heading: Task ID and title
@@ -629,7 +621,7 @@ Generate human-readable archive summaries.
     - Attempts count
     - Commit hash
     - Separator
-- Write to `.devloop/archive/wave-N.md`
+- Write to `.devloop/archive/archive-TIMESTAMP.md`
 - Return file path
 
 **Acceptance:**
@@ -647,16 +639,16 @@ Orchestrate the full archival process.
 
 **Requirements:**
 
-- Implement `ArchiveWave(cfg *Config, storage *storage.Storage, wave int) error` in archiver.go
+- Implement `ArchiveTasks(cfg *Config, storage *storage.Storage, taskIDs []string) error` in archiver.go
 - Workflow:
-  1. Validate wave has completed tasks
+  1. Query specified tasks (must be completed)
   2. Export to JSONL
   3. Generate markdown summary
   4. Update tasks status to "archived"
   5. Update archive index
   6. Save archive index
 - Create archive directory if missing
-- Return error if wave has no completed tasks
+- Return error if no completed tasks provided
 
 **Acceptance:**
 
@@ -670,48 +662,48 @@ Orchestrate the full archival process.
 
 **Model:** `claude-haiku-4-5-20251001` | **Complexity:** `simple`
 
-Create CLI command for archiving waves.
+Create CLI command for archiving tasks.
 
 **Requirements:**
 
 - Create `internal/commands/archive.go`
 - Implement `archive` command
 - Flags:
-  - `--wave N` - archive specific wave (required)
-  - `--auto` - auto-detect completed waves and archive all
+  - `--tasks ID1,ID2,...` - archive specific tasks
+  - `--auto` - auto-detect and archive all completed tasks
 - Load config and storage
-- Call ArchiveWave
+- Call ArchiveTasks
 - Display summary of archived tasks
 
 **Acceptance:**
 
-- `devloop archive --wave 1` works
-- `devloop archive --auto` finds and archives completed waves
+- `devloop archive --tasks DEV-1,DEV-2` works
+- `devloop archive --auto` finds and archives completed tasks
 - Displays summary
 
 ### Task 5.6: Auto-archival integration
 
 **Model:** `claude-haiku-4-5-20251001` | **Complexity:** `simple`
 
-Add automatic archival to executor when wave completes.
+Add automatic archival to executor for completed tasks.
 
 **Requirements:**
 
 - Modify `internal/executor/executor.go`
-- After all tasks in wave complete:
+- After execution completes:
   - Check if config.Archival.AutoArchive is true
-  - If yes, call archiver.ArchiveWave
+  - If yes, archive all completed tasks
   - Log archival action
-- Only archive if ALL tasks in wave are completed or failed
+- Only archive tasks with status=completed
 
 **Acceptance:**
 
-- Wave auto-archives when complete
+- Auto-archives completed tasks
 - Respects config setting
 - Logs action
-- Doesn't archive incomplete waves
+- Doesn't archive incomplete tasks
 
-## Wave 6: Session Management & Polish
+## Session Management & Polish
 
 ### Task 6.1: Session status command
 
@@ -801,7 +793,7 @@ Add progress bars/spinners for long operations.
 
 - Add dependency: `go get github.com/schollz/progressbar/v3`
 - Update executor.go to show progress:
-  - Overall wave progress: "Task 3/10"
+  - Overall progress: "Task 3/10"
   - Attempt progress: "Attempt 1/2"
   - Verification running: spinner
 - Update todo processor to show: "Processing TODO items..." with spinner
@@ -865,7 +857,7 @@ Generate documentation from code.
 - make docs regenerates docs
 - Docs are readable
 
-## Wave 7: Testing & Release
+## Testing & Release
 
 ### Task 7.1: Unit tests for config
 
@@ -1026,7 +1018,7 @@ Create example project and getting started guide.
 
 All tasks completed when:
 
-- ✓ All 7 waves complete
+- ✓ All major phases complete
 - ✓ Unit test coverage >80%
 - ✓ Integration tests pass
 - ✓ All CLI commands functional

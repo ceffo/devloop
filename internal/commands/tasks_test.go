@@ -50,11 +50,6 @@ func TestTasksListCommand(t *testing.T) {
 			HaltOnFailure: true,
 			AutoCommit:    true,
 		},
-		Files: config.FilesConfig{
-			PRD:   "docs/PRD.md",
-			Tasks: "docs/TASKS.md",
-			Todo:  ".todo/TODO.md",
-		},
 	}
 
 	// Save config
@@ -70,7 +65,6 @@ func TestTasksListCommand(t *testing.T) {
 		{
 			ID:         "1.1",
 			Title:      "Setup project",
-			Wave:       1,
 			Status:     "completed",
 			Complexity: "simple",
 			Execution: storage.TaskExecution{
@@ -81,7 +75,6 @@ func TestTasksListCommand(t *testing.T) {
 		{
 			ID:         "1.2",
 			Title:      "Implement feature X",
-			Wave:       1,
 			Status:     "in_progress",
 			Complexity: "moderate",
 			Execution: storage.TaskExecution{
@@ -92,7 +85,6 @@ func TestTasksListCommand(t *testing.T) {
 		{
 			ID:         "2.1",
 			Title:      "Add tests",
-			Wave:       2,
 			Status:     "pending",
 			Complexity: "simple",
 			Tags:       []string{"testing"},
@@ -100,7 +92,6 @@ func TestTasksListCommand(t *testing.T) {
 		{
 			ID:         "2.2",
 			Title:      "Refactor component",
-			Wave:       2,
 			Status:     "failed",
 			Complexity: "complex",
 			Execution: storage.TaskExecution{
@@ -140,17 +131,6 @@ func TestTasksListCommand(t *testing.T) {
 
 	if filtered[0].ID != "1.1" {
 		t.Errorf("expected task 1.1, got %s", filtered[0].ID)
-	}
-
-	// Test filtering by wave
-	filter = storage.Filter{Wave: 2}
-	filtered, err = store.QueryTasks(filter)
-	if err != nil {
-		t.Fatalf("failed to query tasks: %v", err)
-	}
-
-	if len(filtered) != 2 {
-		t.Fatalf("expected 2 tasks in wave 2, got %d", len(filtered))
 	}
 
 	// Test filtering by complexity
@@ -296,11 +276,6 @@ func TestTasksShowCommand(t *testing.T) {
 			HaltOnFailure: true,
 			AutoCommit:    true,
 		},
-		Files: config.FilesConfig{
-			PRD:   "docs/PRD.md",
-			Tasks: "docs/TASKS.md",
-			Todo:  ".todo/TODO.md",
-		},
 	}
 
 	// Save config
@@ -315,7 +290,6 @@ func TestTasksShowCommand(t *testing.T) {
 	task := &storage.Task{
 		ID:          "1.1",
 		Title:       "Setup project structure",
-		Wave:        1,
 		Status:      "completed",
 		Complexity:  "simple",
 		Description: "Initialize project with proper directory structure and dependencies",
@@ -468,11 +442,6 @@ func TestTasksUpdateCommand(t *testing.T) {
 			HaltOnFailure: true,
 			AutoCommit:    true,
 		},
-		Files: config.FilesConfig{
-			PRD:   "docs/PRD.md",
-			Tasks: "docs/TASKS.md",
-			Todo:  ".todo/TODO.md",
-		},
 	}
 
 	// Save config
@@ -488,7 +457,6 @@ func TestTasksUpdateCommand(t *testing.T) {
 	task := &storage.Task{
 		ID:         "1.1",
 		Title:      "Test task",
-		Wave:       1,
 		Status:     "pending",
 		Complexity: "simple",
 		Metadata: storage.TaskMetadata{

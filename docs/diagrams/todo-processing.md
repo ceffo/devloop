@@ -61,7 +61,7 @@ flowchart TD
 TODO items in markdown format:
 
 ```markdown
-## Wave 1: Core Infrastructure
+## Phase 1: Core Infrastructure
 
 ### High Priority
 - [ ] Task description here
@@ -75,7 +75,7 @@ TODO items in markdown format:
 
 The AI agent (using a complex model like Opus or GPT-5) analyzes TODO items and generates structured tasks with:
 
-- **Hierarchical IDs**: Assigns IDs like "1.1", "1.2", "2.1" based on wave and sequence
+- **Task IDs**: Assigns IDs like "DEV-1", "DEV-2" (JIRA-style) or "1.1", "1.2" (hierarchical)
 - **Complexity Assessment**: Determines if task is simple/moderate/complex
 - **Model Selection**: Maps complexity to appropriate AI model
 - **Dependencies**: Identifies blockedBy relationships between tasks

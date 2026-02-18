@@ -9,11 +9,11 @@ import (
 
 func sampleTasks() []TaskItem {
 	return []TaskItem{
-		{ID: "DEV-1", Title: "Setup project", Status: StatusCompleted, Complexity: "simple", Wave: 1},
-		{ID: "DEV-2", Title: "Build core", Status: StatusRunning, Complexity: "moderate", Wave: 1, Attempt: 1, MaxAttempt: 3},
-		{ID: "DEV-3", Title: "Add tests", Status: StatusPending, Complexity: "simple", Wave: 1},
-		{ID: "DEV-4", Title: "Implement feature", Status: StatusBlocked, Complexity: "complex", Wave: 2, BlockedBy: []string{"DEV-2", "DEV-3"}},
-		{ID: "DEV-5", Title: "Deploy", Status: StatusFailed, Complexity: "moderate", Wave: 2},
+		{ID: "DEV-1", Title: "Setup project", Status: StatusCompleted, Complexity: "simple"},
+		{ID: "DEV-2", Title: "Build core", Status: StatusRunning, Complexity: "moderate", Attempt: 1, MaxAttempt: 3},
+		{ID: "DEV-3", Title: "Add tests", Status: StatusPending, Complexity: "simple"},
+		{ID: "DEV-4", Title: "Implement feature", Status: StatusBlocked, Complexity: "complex", BlockedBy: []string{"DEV-2", "DEV-3"}},
+		{ID: "DEV-5", Title: "Deploy", Status: StatusFailed, Complexity: "moderate"},
 	}
 }
 

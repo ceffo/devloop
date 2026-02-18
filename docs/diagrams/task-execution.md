@@ -21,7 +21,7 @@ stateDiagram-v2
     retry_check --> in_progress: Attempts < max_attempts
     retry_check --> failed: Max attempts reached
     
-    completed --> archived: Wave completion
+    completed --> archived: Manual archive
     failed --> [*]
     archived --> [*]
     
@@ -49,7 +49,7 @@ stateDiagram-v2
 - **in_progress**: Task execution has begun
 - **completed**: Task finished successfully with verification passed
 - **failed**: Task failed after all retry attempts exhausted
-- **archived**: Completed task moved to archive when wave completes
+- **archived**: Completed task moved to archive manually or automatically
 
 ### Execution Steps
 

@@ -88,7 +88,6 @@ func TestExecuteTaskSuccess(t *testing.T) {
 			AutoCommit:    false,
 			HaltOnFailure: true,
 		},
-		Files: config.FilesConfig{},
 	}
 
 	// Create storage
@@ -181,7 +180,6 @@ func TestExecuteTaskRetry(t *testing.T) {
 			AutoCommit:    false,
 			HaltOnFailure: false,
 		},
-		Files: config.FilesConfig{},
 	}
 
 	// Create storage
@@ -270,7 +268,6 @@ func TestExecuteTaskAgentError(t *testing.T) {
 			AutoCommit:    false,
 			HaltOnFailure: false,
 		},
-		Files: config.FilesConfig{},
 	}
 
 	// Create storage

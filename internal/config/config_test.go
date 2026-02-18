@@ -69,11 +69,6 @@ func TestSaveAndLoadConfig(t *testing.T) {
 			AutoCommit:    true,
 			CommitFormat:  "task {task_id}: {title}",
 		},
-		Files: FilesConfig{
-			PRD:   "docs/PRD.md",
-			Tasks: "docs/TASKS.md",
-			Todo:  ".todo/TODO.md",
-		},
 	}
 
 	// Save config
@@ -141,11 +136,6 @@ func TestLoadConfig_ValidJSON(t *testing.T) {
 			"max_attempts": 2,
 			"halt_on_failure": true,
 			"auto_commit": true
-		},
-		"files": {
-			"prd": "docs/PRD.md",
-			"tasks": "docs/TASKS.md",
-			"todo": ".todo/TODO.md"
 		}
 	}`
 

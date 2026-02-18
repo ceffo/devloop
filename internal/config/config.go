@@ -16,7 +16,6 @@ type Config struct {
 	Verification VerificationConfig `json:"verification"`
 	CLI          CLIConfig          `json:"cli"`
 	Execution    ExecutionConfig    `json:"execution"`
-	Files        FilesConfig        `json:"files"`
 	Archival     ArchivalConfig     `json:"archival,omitempty"`
 	Prompts      PromptsConfig      `json:"prompts,omitempty"`
 }
@@ -76,13 +75,6 @@ type ExecutionConfig struct {
 	HaltOnFailure bool   `json:"halt_on_failure"`
 	AutoCommit    bool   `json:"auto_commit"`
 	CommitFormat  string `json:"commit_format,omitempty"`
-}
-
-// FilesConfig maps to project artifact locations
-type FilesConfig struct {
-	PRD   string `json:"prd,omitempty"`
-	Tasks string `json:"tasks,omitempty"`
-	Todo  string `json:"todo,omitempty"`
 }
 
 // ArchivalConfig controls archival behavior
@@ -284,11 +276,6 @@ func getDefaultConfig() *Config {
 			AutoCommit:    true,
 			CommitFormat:  "task {task_id}: {title}",
 		},
-		Files: FilesConfig{
-			PRD:   "docs/PRD.md",
-			Tasks: "docs/TASKS.md",
-			Todo:  ".todo/TODO.md",
-		},
 		Archival: ArchivalConfig{
 			AutoArchive: false,
 		},
@@ -346,18 +333,6 @@ func applyDefaults(cfg *Config) {
 
 	if cfg.Execution.CommitFormat == "" {
 		cfg.Execution.CommitFormat = defaults.Execution.CommitFormat
-	}
-
-	if cfg.Files.PRD == "" {
-		cfg.Files.PRD = defaults.Files.PRD
-	}
-
-	if cfg.Files.Tasks == "" {
-		cfg.Files.Tasks = defaults.Files.Tasks
-	}
-
-	if cfg.Files.Todo == "" {
-		cfg.Files.Todo = defaults.Files.Todo
 	}
 }
 

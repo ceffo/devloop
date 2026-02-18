@@ -5,9 +5,6 @@ type Filter struct {
 	// Status filters tasks by status (e.g., "pending", "completed")
 	Status string
 
-	// Wave filters tasks by wave number
-	Wave int
-
 	// Complexity filters tasks by complexity level (e.g., "simple", "moderate", "complex")
 	Complexity string
 
@@ -25,11 +22,6 @@ type Filter struct {
 func (t *Task) matchesFilter(f Filter) bool {
 	// Filter by Status (AND)
 	if f.Status != "" && t.Status != f.Status {
-		return false
-	}
-
-	// Filter by Wave (AND)
-	if f.Wave != 0 && t.Wave != f.Wave {
 		return false
 	}
 

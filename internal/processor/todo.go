@@ -210,8 +210,7 @@ func renderTodoPrompt(project config.ProjectConfig, todos []TodoItem, nextID str
 }
 
 // ProcessTodoItems converts TODO items into structured tasks using AI agent
-// If review is true, tasks are displayed and user confirmation is required before returning
-func ProcessTodoItems(cfg *config.Config, todos []TodoItem, review bool) ([]*storage.Task, error) {
+func ProcessTodoItems(cfg *config.Config, todos []TodoItem) ([]*storage.Task, error) {
 	if len(todos) == 0 {
 		return []*storage.Task{}, nil
 	}
@@ -262,13 +261,6 @@ func ProcessTodoItems(cfg *config.Config, todos []TodoItem, review bool) ([]*sto
 		return nil, fmt.Errorf("failed to parse tasks from JSON: %w", err)
 	}
 
-	// If review mode, display tasks and prompt for confirmation
-	if review {
-		if !confirmTasks(tasks) {
-			return nil, fmt.Errorf("task processing cancelled by user")
-		}
-	}
-
 	return tasks, nil
 }
 
@@ -312,8 +304,8 @@ func generateNextTaskID(store *storage.Storage, cfg *config.Config) (string, err
 // generateNextTaskIDHierarchical generates the next hierarchical ID (e.g., "1.2", "2.1")
 func generateNextTaskIDHierarchical(tasks []*storage.Task) (string, error) {
 	// Find the maximum task ID
-	maxWave := 0
-	maxTaskInWave := 0
+	maxGroup := 0
+	maxTaskInGroup := 0
 
 	for _, task := range tasks {
 		parts := strings.Split(task.ID, ".")
@@ -321,7 +313,7 @@ func generateNextTaskIDHierarchical(tasks []*storage.Task) (string, error) {
 			continue
 		}
 
-		wave, err := strconv.Atoi(parts[0])
+		group, err := strconv.Atoi(parts[0])
 		if err != nil {
 			continue
 		}
@@ -331,17 +323,17 @@ func generateNextTaskIDHierarchical(tasks []*storage.Task) (string, error) {
 			continue
 		}
 
-		if wave > maxWave {
-			maxWave = wave
-			maxTaskInWave = taskNum
-		} else if wave == maxWave && taskNum > maxTaskInWave {
-			maxTaskInWave = taskNum
+		if group > maxGroup {
+			maxGroup = group
+			maxTaskInGroup = taskNum
+		} else if group == maxGroup && taskNum > maxTaskInGroup {
+			maxTaskInGroup = taskNum
 		}
 	}
 
-	// Return next task ID in the same wave
-	nextTaskNum := maxTaskInWave + 1
-	return fmt.Sprintf("%d.%d", maxWave, nextTaskNum), nil
+	// Return next task ID in the same group
+	nextTaskNum := maxTaskInGroup + 1
+	return fmt.Sprintf("%d.%d", maxGroup, nextTaskNum), nil
 }
 
 // generateNextJiraID generates the next JIRA ID (e.g., "DEV-124")
@@ -410,20 +402,15 @@ func parseTasksFromJSON(output string, cfg *config.Config, todos []TodoItem) ([]
 	now := time.Now()
 
 	for _, tj := range taskJSONs {
-		// Determine wave from task ID
-		wave := extractWaveFromID(tj.ID)
-
 		// Find source TODO item (if any)
 		sourceTodoItem := ""
 		if len(todos) > 0 {
-			// Use first TODO item as source (simplified approach)
 			sourceTodoItem = todos[0].ID
 		}
 
 		task := &storage.Task{
 			ID:                 tj.ID,
 			Title:              tj.Title,
-			Wave:               wave,
 			Status:             "pending",
 			Complexity:         tj.Complexity,
 			Description:        tj.Description,
@@ -447,51 +434,4 @@ func parseTasksFromJSON(output string, cfg *config.Config, todos []TodoItem) ([]
 	}
 
 	return tasks, nil
-}
-
-// extractWaveFromID extracts the wave number from a task ID
-// For hierarchical IDs (e.g., "1.1" -> 1), extracts the wave number
-// For JIRA IDs (e.g., "DEV-123") or invalid IDs, returns 1 (default)
-func extractWaveFromID(id string) int {
-	// Check if it's a hierarchical ID
-	parts := strings.Split(id, ".")
-	if len(parts) >= 2 {
-		if wave, err := strconv.Atoi(parts[0]); err == nil {
-			return wave
-		}
-	}
-
-	// JIRA IDs and invalid IDs default to wave 1
-	// The wave field should be stored separately in the Task struct
-	return 1
-}
-
-// confirmTasks displays tasks and prompts user for confirmation
-func confirmTasks(tasks []*storage.Task) bool {
-	fmt.Println("\n=== Generated Tasks ===")
-	for _, task := range tasks {
-		fmt.Printf("\n[%s] %s\n", task.ID, task.Title)
-		fmt.Printf("  Complexity: %s\n", task.Complexity)
-		fmt.Printf("  Description: %s\n", task.Description)
-		if len(task.AcceptanceCriteria) > 0 {
-			fmt.Println("  Acceptance Criteria:")
-			for _, criterion := range task.AcceptanceCriteria {
-				fmt.Printf("    - %s\n", criterion)
-			}
-		}
-		if len(task.BlockedBy) > 0 {
-			fmt.Printf("  Blocked by: %v\n", task.BlockedBy)
-		}
-		if len(task.Tags) > 0 {
-			fmt.Printf("  Tags: %v\n", task.Tags)
-		}
-	}
-
-	fmt.Printf("\nGenerated %d task(s). Save to storage? [y/N]: ", len(tasks))
-
-	var response string
-	fmt.Scanln(&response)
-
-	response = strings.ToLower(strings.TrimSpace(response))
-	return response == "y" || response == "yes"
 }

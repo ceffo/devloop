@@ -71,11 +71,6 @@ Tech Stack: {{.TechStack}}
 Path: {{.ProjectPath}}
 Main Branch: {{.MainBranch}}
 
-## Referenced Files
-{{if .PRDPath}}- PRD: {{.PRDPath}}{{end}}
-{{if .TasksPath}}- Tasks: {{.TasksPath}}{{end}}
-{{if .TodoPath}}- TODO: {{.TodoPath}}{{end}}
-
 ## Task Details
 ID: {{.TaskID}}
 Title: {{.Title}}
@@ -125,9 +120,6 @@ type TaskPromptData struct {
 	TechStack           string
 	ProjectPath         string
 	MainBranch          string
-	PRDPath             string
-	TasksPath           string
-	TodoPath            string
 	TaskID              string
 	Title               string
 	Complexity          string
@@ -179,9 +171,6 @@ func RenderTaskPrompt(cfg *config.Config, task *storage.Task, attempt int, prevE
 		TechStack:           cfg.Project.TechStack,
 		ProjectPath:         cfg.Project.Path,
 		MainBranch:          cfg.Project.MainBranch,
-		PRDPath:             cfg.Files.PRD,
-		TasksPath:           cfg.Files.Tasks,
-		TodoPath:            cfg.Files.Todo,
 		TaskID:              task.ID,
 		Title:               task.Title,
 		Complexity:          task.Complexity,

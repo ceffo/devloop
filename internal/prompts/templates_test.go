@@ -132,11 +132,6 @@ func TestRenderTaskPrompt(t *testing.T) {
 				Verification: config.VerificationConfig{
 					Command: "npm test",
 				},
-				Files: config.FilesConfig{
-					PRD:   "docs/PRD.md",
-					Tasks: "docs/TASKS.md",
-					Todo:  ".todo/TODO.md",
-				},
 				Prompts: config.PromptsConfig{
 					CustomInstructions: "",
 				},
@@ -171,8 +166,6 @@ func TestRenderTaskPrompt(t *testing.T) {
 				"Submission calls API",
 				"npm test",
 				"Attempt: 1 of 2",
-				"docs/PRD.md",
-				"docs/TASKS.md",
 			},
 			expectError: false,
 		},
@@ -187,14 +180,6 @@ func TestRenderTaskPrompt(t *testing.T) {
 				},
 				Verification: config.VerificationConfig{
 					Command: "go test ./...",
-				},
-				Files: config.FilesConfig{
-					PRD:   "PRD.md",
-					Tasks: "TASKS.md",
-					Todo:  "TODO.md",
-				},
-				Prompts: config.PromptsConfig{
-					CustomInstructions: "",
 				},
 			},
 			task: &storage.Task{
@@ -236,7 +221,6 @@ func TestRenderTaskPrompt(t *testing.T) {
 				Verification: config.VerificationConfig{
 					Command: "pytest",
 				},
-				Files: config.FilesConfig{},
 				Prompts: config.PromptsConfig{
 					CustomInstructions: "Always use type hints and docstrings",
 				},
@@ -271,7 +255,6 @@ func TestRenderTaskPrompt(t *testing.T) {
 				Verification: config.VerificationConfig{
 					Command: "rspec",
 				},
-				Files:   config.FilesConfig{},
 				Prompts: config.PromptsConfig{},
 			},
 			task: &storage.Task{
@@ -372,7 +355,6 @@ func TestRenderTaskPromptOutput(t *testing.T) {
 		Verification: config.VerificationConfig{
 			Command: "go test",
 		},
-		Files:   config.FilesConfig{},
 		Prompts: config.PromptsConfig{},
 	}
 	task := &storage.Task{

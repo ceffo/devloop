@@ -39,43 +39,41 @@ Current output is a placeholder. Implementation tracked in `docs/TASKS.md`.
 go test ./...
 ```
 
-### 3. Execute Tasks with Modal dev-loop.sh
+### 3. Execute Tasks
 
-The project is configured to use Modal's `dev-loop.sh` for automated task execution:
+Execute tasks using the devloop system or manually:
 
 ```bash
-# Run all tasks in Wave 1
-cd /home/moncef/code/devloop
-~/code/modal/scripts/dev-loop.sh 1
+# Run all pending tasks
+devloop run
 
-# Run specific task range in Wave 2
-~/code/modal/scripts/dev-loop.sh 2 2.1 2.3
+# Run specific task
+devloop run --task DEV-1
 
-# Or use the convenience wrapper
-./scripts/dev-loop-run.sh 1
+# Or manually follow docs/TASKS.md
 ```
 
-The dev-loop.sh script will:
+The execution will:
 
-1. Read tasks from `docs/TASKS.md`
+1. Read tasks from storage
 2. Select appropriate model based on complexity
 3. Execute each task with AI agent
 4. Run verification: `go test ./... && go build ./cmd/devloop`
 5. Auto-commit on success
 
-## Implementation Waves
+## Implementation Status
 
-Tasks are organized into 7 waves (see `docs/TASKS.md`). Work sequentially—later waves depend on earlier ones.
+Tasks are tracked in `docs/TASKS.md`. Work sequentially—later tasks may depend on earlier ones.
 
-**Current Status**: Waves 1-5 are largely complete. The system is functional with core features implemented:
+**Current Status**: Core features are implemented. The system is functional:
 
-1. ✅ **Wave 1**: Core Infrastructure (config, storage)
-2. ✅ **Wave 2**: CLI Commands Foundation
-3. ✅ **Wave 3**: TODO Processing System
-4. ✅ **Wave 4**: Execution Engine
-5. ✅ **Wave 5**: Archival System
-6. 🚧 **Wave 6**: Session Management & Polish (in progress)
-7. ⏳ **Wave 7**: Testing & Release (pending)
+1. ✅ **Core Infrastructure** (config, storage)
+2. ✅ **CLI Commands Foundation**
+3. ✅ **TODO Processing System**
+4. ✅ **Execution Engine**
+5. ✅ **Archival System**
+6. 🚧 **Session Management & Polish** (in progress)
+7. ⏳ **Testing & Release** (pending)
 
 ## Manual Development
 
@@ -144,7 +142,7 @@ The `.devloop/config.json` file configures how dev-loop.sh runs tasks:
 ## Tips for Contributors
 
 1. **Follow Go conventions** - PascalCase exports, camelCase private
-2. **Write tests** - Don't wait for Wave 7
+2. **Write tests** - Add tests alongside implementation
 3. **Keep it simple** - KISS principle applies
 4. **Document exports** - Godoc comments on all exported functions
 5. **Handle errors** - Return errors, don't panic
@@ -226,8 +224,8 @@ ls ~/code/modal/scripts/dev-loop.sh
 
 1. **Read** `docs/DESIGN.md` to understand architecture
 2. **Read** `CLAUDE.md` for coding guidelines
-3. **Review** `docs/TASKS.md` Wave 1 tasks
-4. **Execute** Wave 1 with dev-loop.sh or manually
-5. **Iterate** through remaining waves
+3. **Review** `docs/TASKS.md` for pending tasks
+4. **Execute** tasks with devloop or manually
+5. **Iterate** through the task list
 
 Happy building! 🚀

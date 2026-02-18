@@ -20,7 +20,7 @@ just test                     # Run all tests
 - **Storage**: Append-only JSONL in `.devloop/tasks.jsonl`, config in `.devloop/config.json`
 - **Packages**: Commands, executor, storage, processor (TODO), config, agent, archiver, prompts, UI
 - **Pattern**: Error-wrapping with `fmt.Errorf()`, colocated tests (`foo_test.go`), table-driven tests
-- **Architecture**: See `docs/DESIGN.md` for full design; tasks organized into 7 waves in `docs/TASKS.md`
+- **Architecture**: See `docs/DESIGN.md` for full design; tasks tracked in `docs/TASKS.md`
 
 ## Testing
 

@@ -23,12 +23,11 @@ import (
 //
 // Parameters:
 //   - cfg: Configuration
-//   - wave: Filter by wave number (0 = all waves)
 //   - taskID: Filter by specific task ID (empty = all tasks)
 //   - continueSession: Whether to resume from last checkpoint
 //   - dryRun: If true, only show what would be executed without running
 //   - agentName: Name of agent to use (empty = default agent)
-func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession bool, dryRun bool, agentName string) error {
+func ExecuteDevLoop(cfg *config.Config, taskID string, continueSession bool, dryRun bool, agentName string) error {
 	// Setup signal handling for graceful interrupts
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -72,9 +71,6 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 	filter := storage.Filter{
 		Status: "pending",
 	}
-	if wave > 0 {
-		filter.Wave = wave
-	}
 
 	// Build initial task list
 	tasks, err := getReadyTasksForExecution(store, filter, taskID, continueSession, session)
@@ -111,7 +107,6 @@ func ExecuteDevLoop(cfg *config.Config, wave int, taskID string, continueSession
 			Title:      t.Title,
 			Status:     t.Status,
 			Complexity: t.Complexity,
-			Wave:       t.Wave,
 		})
 	}
 	session.TaskSnapshot = taskSnapshots

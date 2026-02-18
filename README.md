@@ -12,7 +12,7 @@ Agent-driven development workflow system.
 - 📊 **Rich metadata**: Track attempts, duration, errors, dependencies
 - 🔍 **Queryable state**: Complex filtering and reporting on task status
 - 💾 **Crash-safe**: Resume from any point with session management
-- 📦 **Automatic archival**: Prevent context bloat by archiving completed waves
+- 📦 **Automatic archival**: Prevent context bloat by archiving completed tasks
 - 🎯 **Project-agnostic**: Configuration-driven for any project
 - 🚀 **Single binary**: Easy distribution and deployment
 
@@ -66,7 +66,7 @@ See [docs/DESIGN.md](docs/DESIGN.md) for full architecture documentation and [do
 2. Tasks → AI agent execution with retries
 3. Verification after each attempt
 4. Auto-commit on success (optional)
-5. Archive completed waves (optional)
+5. Archive completed tasks (optional)
 6. Session checkpointing for crash recovery
 
 ## Commands
@@ -83,7 +83,7 @@ devloop config validate         # Validate configuration file
 devloop todo process FILE       # Convert TODO items to tasks
 
 # Task execution
-devloop run [--wave N]          # Execute tasks
+devloop run                      # Execute tasks
 devloop run [--task ID]         # Run specific task
 devloop run --continue          # Resume from last checkpoint
 
@@ -94,8 +94,8 @@ devloop tasks show TASK_ID      # Show task details
 devloop tasks update ID --status X  # Update task status
 
 # Archival
-devloop archive --wave N        # Archive specific wave
-devloop archive --auto          # Auto-archive completed waves
+devloop archive                  # Archive completed tasks
+devloop archive --auto          # Auto-archive completed tasks
 
 # Session management
 devloop session status          # Show current session

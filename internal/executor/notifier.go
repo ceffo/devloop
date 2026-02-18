@@ -216,7 +216,6 @@ func storageTasks2TUIItems(tasks []*storage.Task) []ui.TaskItem {
 			Title:      t.Title,
 			Status:     status,
 			Complexity: t.Complexity,
-			Wave:       t.Wave,
 			BlockedBy:  t.BlockedBy,
 			MaxAttempt: t.Metadata.MaxAttempts,
 		}

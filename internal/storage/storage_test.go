@@ -49,7 +49,6 @@ func createSampleTask(id, title, status string) *Task {
 	return &Task{
 		ID:          id,
 		Title:       title,
-		Wave:        1,
 		Status:      status,
 		Complexity:  "simple",
 		Description: "Test task description",
@@ -412,40 +411,6 @@ func TestQueryTasks_FilterByStatus(t *testing.T) {
 	}
 }
 
-func TestQueryTasks_FilterByWave(t *testing.T) {
-	cfg, _ := createTestConfig(t)
-	storage := NewStorage(cfg)
-
-	// Create tasks in different waves
-	task1 := createSampleTask("1.1", "Task One", "pending")
-	task1.Wave = 1
-
-	task2 := createSampleTask("2.1", "Task Two", "pending")
-	task2.Wave = 2
-
-	task3 := createSampleTask("1.2", "Task Three", "pending")
-	task3.Wave = 1
-
-	storage.SaveTask(task1)
-	storage.SaveTask(task2)
-	storage.SaveTask(task3)
-
-	// Query wave 1 tasks
-	results, err := storage.QueryTasks(Filter{Wave: 1})
-	if err != nil {
-		t.Fatalf("QueryTasks failed: %v", err)
-	}
-
-	if len(results) != 2 {
-		t.Errorf("Expected 2 wave 1 tasks, got %d", len(results))
-	}
-
-	for _, task := range results {
-		if task.Wave != 1 {
-			t.Errorf("Expected wave 1, got %d", task.Wave)
-		}
-	}
-}
 
 func TestQueryTasks_FilterByComplexity(t *testing.T) {
 	cfg, _ := createTestConfig(t)
@@ -616,25 +581,21 @@ func TestQueryTasks_CombinedFilters(t *testing.T) {
 
 	// Create diverse tasks
 	task1 := createSampleTask("1.1", "Task One", "pending")
-	task1.Wave = 1
 	task1.Complexity = "simple"
 	task1.Tags = []string{"backend"}
 	task1.BlockedBy = []string{}
 
 	task2 := createSampleTask("1.2", "Task Two", "pending")
-	task2.Wave = 1
 	task2.Complexity = "complex"
 	task2.Tags = []string{"backend"}
 	task2.BlockedBy = []string{}
 
 	task3 := createSampleTask("1.3", "Task Three", "completed")
-	task3.Wave = 1
 	task3.Complexity = "simple"
 	task3.Tags = []string{"backend"}
 	task3.BlockedBy = []string{}
 
 	task4 := createSampleTask("2.1", "Task Four", "pending")
-	task4.Wave = 2
 	task4.Complexity = "simple"
 	task4.Tags = []string{"backend"}
 	task4.BlockedBy = []string{}
@@ -644,9 +605,8 @@ func TestQueryTasks_CombinedFilters(t *testing.T) {
 	storage.SaveTask(task3)
 	storage.SaveTask(task4)
 
-	// Query: wave=1, status=pending, complexity=simple, unblocked
+	// Query: status=pending, complexity=simple, unblocked
 	results, err := storage.QueryTasks(Filter{
-		Wave:       1,
 		Status:     "pending",
 		Complexity: "simple",
 		BlockedBy:  []string{},
@@ -655,12 +615,12 @@ func TestQueryTasks_CombinedFilters(t *testing.T) {
 		t.Fatalf("QueryTasks failed: %v", err)
 	}
 
-	if len(results) != 1 {
-		t.Errorf("Expected 1 task matching all filters, got %d", len(results))
+	if len(results) != 2 {
+		t.Errorf("Expected 2 tasks matching all filters, got %d", len(results))
 	}
 
 	if len(results) > 0 && results[0].ID != "1.1" {
-		t.Errorf("Expected task 1.1, got %s", results[0].ID)
+		t.Errorf("Expected first task 1.1, got %s", results[0].ID)
 	}
 }
 

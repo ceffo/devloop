@@ -1,20 +1,20 @@
 # Archive Workflow
 
-This diagram shows how completed waves are archived to prevent context bloat.
+This diagram shows how completed tasks are archived to prevent context bloat.
 
 ```mermaid
 flowchart TD
-    START([Wave completes or<br/>'devloop archive' run])
+    START([Execution completes or<br/>'devloop archive' run])
     
     AUTO{Auto-archive<br/>enabled?}
-    DETECT[Detect completed waves<br/>All tasks completed or failed]
-    MANUAL[User specifies wave number]
+    DETECT[Detect completed tasks<br/>Status: completed]
+    MANUAL[User specifies task IDs]
     
-    VALIDATE{Wave has<br/>completed tasks?}
-    QUERY[Query all tasks in wave<br/>Status: completed or failed]
+    VALIDATE{Has completed<br/>tasks?}
+    QUERY[Query specified tasks<br/>Status: completed]
     
-    JSONL[Export to JSONL<br/>.devloop/archive/wave-N.jsonl]
-    MARKDOWN[Generate markdown summary<br/>.devloop/archive/wave-N.md]
+    JSONL[Export to JSONL<br/>.devloop/archive/archive-TIMESTAMP.jsonl]
+    MARKDOWN[Generate markdown summary<br/>.devloop/archive/archive-TIMESTAMP.md]
     
     UPDATE[Update task statuses<br/>completed → archived]
     INDEX[Update archive index<br/>.devloop/archive/index.json]
@@ -52,11 +52,11 @@ flowchart TD
 
 ```text
 .devloop/archive/
-├── index.json          # Archive metadata index
-├── wave-1.jsonl        # Task data (machine-readable)
-├── wave-1.md           # Summary (human-readable)
-├── wave-2.jsonl
-├── wave-2.md
+├── index.json                    # Archive metadata index
+├── archive-2026-02-17.jsonl      # Task data (machine-readable)
+├── archive-2026-02-17.md         # Summary (human-readable)
+├── archive-2026-02-18.jsonl
+├── archive-2026-02-18.md
 └── ...
 ```
 
@@ -73,7 +73,7 @@ Each line is a complete task object:
 
 Human-readable summary with:
 
-- **Wave header**: Wave number and completion timestamp
+- **Archive header**: Archive date and completion timestamp
 - **Statistics**: Total tasks, attempts, duration
 - **Task details**: For each task:
   - ID and title
@@ -90,13 +90,14 @@ Located at `.devloop/archive/index.json`:
 
 ```json
 {
-  "1": {
-    "wave": 1,
-    "archived_at": "2026-02-17T03:30:00Z",
-    "task_count": 6,
-    "task_ids": ["DEV-1", "DEV-2", "DEV-3", "DEV-4", "DEV-5", "DEV-6"],
-    "output_path": ".devloop/archive/wave-1"
-  }
+  "archives": [
+    {
+      "archived_at": "2026-02-17T03:30:00Z",
+      "task_count": 6,
+      "task_ids": ["DEV-1", "DEV-2", "DEV-3", "DEV-4", "DEV-5", "DEV-6"],
+      "output_path": ".devloop/archive/archive-2026-02-17"
+    }
+  ]
 }
 ```
 
@@ -106,8 +107,8 @@ Located at `.devloop/archive/index.json`:
 
 When `config.archival.auto_archive` is enabled:
 
-- Triggered after all tasks in a wave complete
-- Only archives if **all** tasks are completed or failed (no pending tasks)
+- Triggered after task execution completes
+- Only archives completed tasks
 - Runs at the end of `devloop run` execution
 
 ### Manual Archival
@@ -115,10 +116,10 @@ When `config.archival.auto_archive` is enabled:
 Users can manually archive with:
 
 ```bash
-# Archive specific wave
-devloop archive --wave 1
+# Archive specific tasks
+devloop archive --tasks DEV-1,DEV-2
 
-# Auto-detect and archive all completed waves
+# Auto-detect and archive all completed tasks
 devloop archive --auto
 ```
 

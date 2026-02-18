@@ -17,14 +17,6 @@ Atomic units of work with rich metadata:
 - **Execution History**: Multiple attempts with logs
 - **Results**: Verification output, commit hash
 
-### Waves
-
-Logical groupings of tasks (corresponds to implementation phases):
-
-- Tasks within a wave can execute sequentially or in parallel (if not blocked)
-- Wave completion triggers automatic archival (see [archive workflow](diagrams/archive-workflow.md))
-- Provides checkpoint granularity for recovery
-
 ### Storage
 
 JSONL (JSON Lines) format for tasks:
@@ -79,7 +71,7 @@ See [task execution diagram](diagrams/task-execution.md) for state transitions.
    - On success: auto-commit (if enabled), mark completed
    - On failure: record error, retry if attempts remain
    - Checkpoint session state
-3. Auto-archive if wave complete (when enabled)
+3. Auto-archive completed tasks (when enabled)
 
 ### Session Recovery
 
@@ -161,11 +153,11 @@ After each agent execution:
 
 ## Archival System
 
-When wave completes:
+When archiving tasks:
 
-1. Query all completed tasks in wave
-2. Export to `.devloop/archive/wave-N.jsonl`
-3. Generate markdown summary `.devloop/archive/wave-N.md`
+1. Query completed tasks
+2. Export to `.devloop/archive/archive-TIMESTAMP.jsonl`
+3. Generate markdown summary `.devloop/archive/archive-TIMESTAMP.md`
 4. Update task statuses to "archived"
 5. Update archive index
 6. Remove from active context

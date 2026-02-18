@@ -17,7 +17,7 @@ This file contains Claude-specific guidance; all other instructions are in the s
 
 - **Don't over-engineer**: Implement exactly what the task requires
 - **Follow the design**: Architecture is already defined in `docs/DESIGN.md`
-- **Test as you go**: Don't wait for Wave 7 to add tests
+- **Test as you go**: Add tests alongside implementation
 - **Use examples**: Reference similar code in the codebase
 - **Ask when unclear**: Use comments or ask the user if requirements are ambiguous
 - **Session context available**: This file is automatically included in your context

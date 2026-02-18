@@ -8,7 +8,7 @@ import (
 	"github.com/ceffo/devloop/internal/config"
 )
 
-func TestTodoCmd(t *testing.T) {
+func TestProcessCmd(t *testing.T) {
 	// Create a temporary directory for test
 	tmpDir, err := os.MkdirTemp("", "devloop-test-*")
 	if err != nil {
@@ -56,36 +56,42 @@ func TestTodoCmd(t *testing.T) {
 		t.Fatalf("failed to create .devloop directory: %v", err)
 	}
 
-	// Test that TodoCmd returns a valid command
-	cmd := TodoCmd()
+	// Test that ProcessCmd returns a valid command
+	cmd := ProcessCmd()
 	if cmd == nil {
-		t.Error("TodoCmd returned nil")
+		t.Error("ProcessCmd returned nil")
 	}
 
-	if cmd.Use != "todo" {
-		t.Errorf("expected Use to be 'todo', got '%s'", cmd.Use)
+	if cmd.Use != "process" {
+		t.Errorf("expected Use to be 'process', got '%s'", cmd.Use)
 	}
 
-	// Check that process subcommand exists
-	processCmd := cmd.Commands()
-	if len(processCmd) == 0 {
-		t.Error("expected TodoCmd to have subcommands")
+	// Check that todo and prd subcommands exist
+	subCmds := cmd.Commands()
+	if len(subCmds) == 0 {
+		t.Error("expected ProcessCmd to have subcommands")
 	}
 
-	foundProcess := false
-	for _, subCmd := range processCmd {
-		if subCmd.Use == "process FILE" {
-			foundProcess = true
-			break
+	foundTodo := false
+	foundPrd := false
+	for _, subCmd := range subCmds {
+		if subCmd.Use == "todo FILE" {
+			foundTodo = true
+		}
+		if subCmd.Use == "prd FILE" {
+			foundPrd = true
 		}
 	}
 
-	if !foundProcess {
-		t.Error("expected 'process' subcommand to be present")
+	if !foundTodo {
+		t.Error("expected 'todo' subcommand to be present")
+	}
+	if !foundPrd {
+		t.Error("expected 'prd' subcommand to be present")
 	}
 }
 
-func TestTodoProcessCmd_MissingFile(t *testing.T) {
+func TestProcessTodoCmd_MissingFile(t *testing.T) {
 	// Create a temporary directory for test
 	tmpDir, err := os.MkdirTemp("", "devloop-test-*")
 	if err != nil {
@@ -134,7 +140,7 @@ func TestTodoProcessCmd_MissingFile(t *testing.T) {
 	}
 
 	// Create command
-	cmd := todoProcessCmd()
+	cmd := processTodoCmd()
 	cmd.Flags().String("config", configPath, "")
 	cmd.SetArgs([]string{"/nonexistent/file.md"})
 
@@ -145,7 +151,7 @@ func TestTodoProcessCmd_MissingFile(t *testing.T) {
 	}
 }
 
-func TestTodoProcessCmd_EmptyFile(t *testing.T) {
+func TestProcessTodoCmd_EmptyFile(t *testing.T) {
 	// Create a temporary directory for test
 	tmpDir, err := os.MkdirTemp("", "devloop-test-*")
 	if err != nil {
@@ -200,7 +206,7 @@ func TestTodoProcessCmd_EmptyFile(t *testing.T) {
 	}
 
 	// Create command
-	cmd := todoProcessCmd()
+	cmd := processTodoCmd()
 	cmd.Flags().String("config", configPath, "")
 	cmd.SetArgs([]string{todoPath})
 

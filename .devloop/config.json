@@ -18,9 +18,9 @@
       "claude": {
         "tool": "claude",
         "models": {
-          "complex": "claude-opus-4-6",
-          "moderate": "claude-sonnet-4-5-20250929",
-          "simple": "claude-haiku-4-5-20251001"
+          "complex": "opus",
+          "moderate": "sonnet",
+          "simple": "haiku"
         }
       },
       "copilot": {

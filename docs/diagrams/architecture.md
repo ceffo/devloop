@@ -50,7 +50,7 @@ Entry point using Cobra framework. Provides command-line interface with subcomma
 - **todo**: Process TODO items into tasks
 - **run**: Execute the development workflow
 - **tasks**: Manage and view tasks
-- **archive**: Archive completed waves
+- **archive**: Archive completed tasks
 - **session**: Manage execution sessions
 
 ### Commands Layer
@@ -61,7 +61,7 @@ Orchestrates workflows by coordinating between storage, executor, and other comp
 
 - **Storage**: JSONL-based task storage with in-memory querying and filtering
 - **Executor**: Task execution engine with AI agent integration and verification
-- **Archiver**: Archives completed waves to JSONL and markdown summaries
+- **Archiver**: Archives completed tasks to JSONL and markdown summaries
 
 ### Support Components
 

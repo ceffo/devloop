@@ -33,16 +33,14 @@ See `docs/DESIGN.md` for full architecture documentation.
 
 ### Core Concepts
 
-**Tasks** are atomic units with hierarchical IDs (e.g., "1.1", "2.3") and status progression: `pending → in_progress → completed/failed/archived`
-
-**Waves** group related tasks by implementation phase. Tasks within a wave can execute in parallel unless blocked by dependencies.
+**Tasks** are atomic units with IDs (e.g., "DEV-123", "1.1") and status progression: `pending → in_progress → completed/failed/archived`
 
 **Storage** uses append-only JSONL format:
 
 - `.devloop/tasks.jsonl` - One task per line, rewritten on updates
 - `.devloop/config.json` - Project configuration
 - `.devloop/logs/` - Execution logs
-- `.devloop/archive/` - Completed waves
+- `.devloop/archive/` - Completed tasks
 
 ### Package Structure
 
@@ -50,7 +48,7 @@ See `docs/DESIGN.md` for full architecture documentation.
 cmd/devloop/              # CLI entry point
 internal/
   agent/                  # AI agent runner (executes bash/gh commands)
-  archiver/               # Archive completed waves
+  archiver/               # Archive completed tasks
   commands/               # CLI command implementations (Cobra)
   config/                 # Configuration schema & validation
   executor/               # Task execution engine with verification
@@ -165,15 +163,15 @@ var myCmd = &cobra.Command{
 
 ## Task Implementation Workflow
 
-Tasks are tracked in `docs/TASKS.md` organized into 7 waves. Work sequentially—later tasks depend on earlier ones.
+Tasks are tracked in `docs/TASKS.md`. Work sequentially—later tasks may depend on earlier ones.
 
 **When implementing:**
 
 1. Read full task description in `docs/TASKS.md`
-2. Check dependencies (earlier tasks in same wave)
+2. Check dependencies (blocked_by field)
 3. Implement according to requirements
 4. Verify acceptance criteria
-5. Commit with: `task X.Y: <title>` (lowercase, imperative)
+5. Commit with: `task <ID>: <title>` (lowercase, imperative)
 
 **Model annotations guide complexity:**
 

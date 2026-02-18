@@ -12,7 +12,6 @@ func TestTaskMarshalJSON(t *testing.T) {
 	task := &Task{
 		ID:          "1.1",
 		Title:       "Test task",
-		Wave:        1,
 		Status:      "pending",
 		Complexity:  "simple",
 		Description: "A test task",
@@ -53,7 +52,6 @@ func TestTaskUnmarshalJSON(t *testing.T) {
 	jsonData := `{
 		"id": "1.1",
 		"title": "Test task",
-		"wave": 1,
 		"status": "pending",
 		"complexity": "simple",
 		"model": "claude-haiku-4-5-20251001",
@@ -86,9 +84,6 @@ func TestTaskUnmarshalJSON(t *testing.T) {
 	if task.Title != "Test task" {
 		t.Errorf("Expected Title 'Test task', got '%s'", task.Title)
 	}
-	if task.Wave != 1 {
-		t.Errorf("Expected Wave 1, got %d", task.Wave)
-	}
 	if task.Status != "pending" {
 		t.Errorf("Expected Status 'pending', got '%s'", task.Status)
 	}
@@ -104,7 +99,6 @@ func TestTaskRoundTrip(t *testing.T) {
 	original := &Task{
 		ID:          "2.3",
 		Title:       "Complex task",
-		Wave:        2,
 		Status:      "in_progress",
 		Complexity:  "complex",
 		Description: "A complex test task",

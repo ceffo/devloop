@@ -407,9 +407,6 @@ func TestParseTasksFromJSON(t *testing.T) {
 				if task.Status != "pending" {
 					t.Errorf("Status = %q, want %q", task.Status, "pending")
 				}
-				if task.Wave != 1 {
-					t.Errorf("Wave = %d, want %d", task.Wave, 1)
-				}
 				if len(task.AcceptanceCriteria) != 2 {
 					t.Errorf("len(AcceptanceCriteria) = %d, want %d", len(task.AcceptanceCriteria), 2)
 				}
@@ -474,28 +471,6 @@ func TestParseTasksFromJSON(t *testing.T) {
 	}
 }
 
-func TestExtractWaveFromID(t *testing.T) {
-	tests := []struct {
-		id   string
-		want int
-	}{
-		{"1.1", 1},
-		{"2.3", 2},
-		{"10.5", 10},
-		{"invalid", 1},
-		{"1", 1},
-		{"", 1},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.id, func(t *testing.T) {
-			got := extractWaveFromID(tt.id)
-			if got != tt.want {
-				t.Errorf("extractWaveFromID(%q) = %d, want %d", tt.id, got, tt.want)
-			}
-		})
-	}
-}
 
 func TestRenderTodoPrompt(t *testing.T) {
 	project := config.ProjectConfig{

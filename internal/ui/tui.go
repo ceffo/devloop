@@ -26,7 +26,6 @@ type TaskItem struct {
 	Title      string
 	Status     TaskStatus
 	Complexity string
-	Wave       int
 	BlockedBy  []string
 	Attempt    int
 	MaxAttempt int

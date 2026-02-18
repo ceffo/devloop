@@ -409,8 +409,8 @@ func TestSessionMetadata(t *testing.T) {
 			"complex":  "claude-opus",
 		},
 		TaskSnapshot: []TaskSnapshot{
-			{ID: "DEV-1", Title: "First task", Status: "pending", Complexity: "simple", Wave: 1},
-			{ID: "DEV-2", Title: "Second task", Status: "pending", Complexity: "moderate", Wave: 1},
+			{ID: "DEV-1", Title: "First task", Status: "pending", Complexity: "simple"},
+			{ID: "DEV-2", Title: "Second task", Status: "pending", Complexity: "moderate"},
 		},
 		TasksCompleted: []string{},
 		TasksFailed:    []string{},

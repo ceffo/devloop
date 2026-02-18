@@ -1,6 +1,6 @@
 # TODO
 
-## Wave 1: Core Infrastructure
+## Phase 1: Core Infrastructure
 
 ### Configuration
 
@@ -14,7 +14,7 @@
 - ! JSONL operations
 - [ ] Query system
 
-## Wave 2: CLI Commands
+## Phase 2: CLI Commands
 
 - [ ] !! Setup cobra framework
 - [ ] Implement init command

@@ -58,11 +58,6 @@ func ExampleRenderTaskPrompt() {
 		Verification: config.VerificationConfig{
 			Command: "go test ./...",
 		},
-		Files: config.FilesConfig{
-			PRD:   "docs/PRD.md",
-			Tasks: "docs/TASKS.md",
-			Todo:  ".todo/TODO.md",
-		},
 		Prompts: config.PromptsConfig{
 			CustomInstructions: "Follow Go best practices",
 		},
@@ -96,7 +91,7 @@ func ExampleRenderTaskPrompt() {
 	fmt.Printf("Length: %d characters\n", len(result))
 	// Output:
 	// Task prompt rendered successfully
-	// Length: 873 characters
+	// Length: 788 characters
 }
 
 // ExampleRenderTaskPrompt_withError demonstrates task prompt with previous error
@@ -111,7 +106,6 @@ func ExampleRenderTaskPrompt_withError() {
 		Verification: config.VerificationConfig{
 			Command: "pytest",
 		},
-		Files:   config.FilesConfig{},
 		Prompts: config.PromptsConfig{},
 	}
 

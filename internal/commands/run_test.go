@@ -50,11 +50,6 @@ func TestRunCmd(t *testing.T) {
 			"max_attempts": 2,
 			"halt_on_failure": false,
 			"auto_commit": false
-		},
-		"files": {
-			"prd": "docs/PRD.md",
-			"tasks": "docs/TASKS.md",
-			"todo": ".todo/TODO.md"
 		}
 	}`
 
@@ -80,11 +75,6 @@ func TestRunCmd(t *testing.T) {
 	}
 
 	// Test: Command should have flags
-	waveFlag := cmd.Flags().Lookup("wave")
-	if waveFlag == nil {
-		t.Error("Expected --wave flag to be defined")
-	}
-
 	taskFlag := cmd.Flags().Lookup("task")
 	if taskFlag == nil {
 		t.Error("Expected --task flag to be defined")
@@ -123,12 +113,6 @@ func TestRunCmd_Structure(t *testing.T) {
 
 func TestRunCmd_Flags(t *testing.T) {
 	cmd := RunCmd()
-
-	// Test wave flag default value
-	waveFlag := cmd.Flags().Lookup("wave")
-	if waveFlag.DefValue != "0" {
-		t.Errorf("Expected wave default value='0', got '%s'", waveFlag.DefValue)
-	}
 
 	// Test task flag default value
 	taskFlag := cmd.Flags().Lookup("task")

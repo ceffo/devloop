@@ -5,9 +5,8 @@ import "time"
 // Task represents an atomic unit of work in the devloop system
 type Task struct {
 	// Core identification
-	ID    string `json:"id"`    // Hierarchical ID (e.g., "1.1", "2.3")
+	ID    string `json:"id"`    // Task ID (e.g., "DEV-1")
 	Title string `json:"title"` // Brief task title
-	Wave  int    `json:"wave"`  // Wave number (logical grouping)
 
 	// Status and state
 	Status     string `json:"status"`     // pending, in_progress, completed, failed, blocked, archived

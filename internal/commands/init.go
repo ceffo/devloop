@@ -211,11 +211,6 @@ func createInitialConfig(name, path, techStack string) *config.Config {
 			AutoCommit:    true,
 			CommitFormat:  "task {task_id}: {title}",
 		},
-		Files: config.FilesConfig{
-			PRD:   "docs/PRD.md",
-			Tasks: "docs/TASKS.md",
-			Todo:  ".todo/TODO.md",
-		},
 		Archival: config.ArchivalConfig{
 			AutoArchive: false,
 		},

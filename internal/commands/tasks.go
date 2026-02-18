@@ -44,7 +44,6 @@ Example:
 func tasksListCmd() *cobra.Command {
 	var (
 		statusFilter     string
-		waveFilter       int
 		complexityFilter string
 		tagsFilter       string
 	)
@@ -52,10 +51,10 @@ func tasksListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List tasks with optional filtering",
-		Long: `List all tasks with optional filtering by status, wave, complexity, or tags.
+		Long: `List all tasks with optional filtering by status, complexity, or tags.
 
 The output is displayed as a formatted table with columns:
-  - ID: Task identifier (hierarchical)
+  - ID: Task identifier
   - Title: Task title
   - Status: Current task status (color-coded)
   - Complexity: Task complexity level
@@ -65,7 +64,6 @@ The output is displayed as a formatted table with columns:
 Examples:
   devloop tasks list
   devloop tasks list --status pending
-  devloop tasks list --wave 1
   devloop tasks list --complexity moderate
   devloop tasks list --tags backend,api`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -84,7 +82,6 @@ Examples:
 			// Build filter
 			filter := storage.Filter{
 				Status:     statusFilter,
-				Wave:       waveFilter,
 				Complexity: complexityFilter,
 			}
 
@@ -117,7 +114,6 @@ Examples:
 
 	// Add flags
 	cmd.Flags().StringVar(&statusFilter, "status", "", "filter by status (pending, in_progress, completed, failed, blocked, archived)")
-	cmd.Flags().IntVar(&waveFilter, "wave", 0, "filter by wave number")
 	cmd.Flags().StringVar(&complexityFilter, "complexity", "", "filter by complexity (simple, moderate, complex)")
 	cmd.Flags().StringVar(&tagsFilter, "tags", "", "filter by tags (comma-separated)")
 
@@ -280,7 +276,7 @@ func tasksShowCmd() *cobra.Command {
 		Long: `Display complete details for a specific task.
 
 Shows all task fields including:
-  - Metadata (ID, wave, complexity, status, timestamps)
+  - Metadata (ID, complexity, status, timestamps)
   - Description and acceptance criteria
   - Execution history with attempt details
   - Results (if completed)
@@ -331,7 +327,6 @@ func displayTaskDetails(task *storage.Task) {
 
 	// Metadata Section
 	fmt.Println(ui.Heading2("Metadata:"))
-	fmt.Printf("  Wave:         %d\n", task.Wave)
 	fmt.Printf("  Status:       %s\n", formatStatus(task.Status))
 	fmt.Printf("  Complexity:   %s\n", task.Complexity)
 	fmt.Printf("  Created:      %s\n", task.Metadata.CreatedAt.Format("2006-01-02 15:04:05"))
