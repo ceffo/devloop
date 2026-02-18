@@ -3,10 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/ceffo/devloop/internal/agent"
@@ -22,23 +19,16 @@ import (
 // auto-commits, and session checkpointing.
 //
 // Parameters:
+//   - ctx: Context for cancellation (should be signal-aware from the caller)
 //   - cfg: Configuration
 //   - taskID: Filter by specific task ID (empty = all tasks)
 //   - continueSession: Whether to resume from last checkpoint
 //   - dryRun: If true, only show what would be executed without running
 //   - agentName: Name of agent to use (empty = default agent)
-func ExecuteDevLoop(cfg *config.Config, taskID string, continueSession bool, dryRun bool, agentName string) error {
-	// Setup signal handling for graceful interrupts
-	ctx, cancel := context.WithCancel(context.Background())
+func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, continueSession bool, dryRun bool, agentName string) error {
+	// Use a derived context so we can cancel internally if needed (e.g. from TUI)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		fmt.Println("\n\n⚠️  Interrupt received, stopping after current task...")
-		cancel()
-	}()
 
 	// Initialize storage
 	store := storage.NewStorage(cfg)

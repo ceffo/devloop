@@ -388,3 +388,78 @@ func TestFilterTasksAfterCheckpointNotFound(t *testing.T) {
 		t.Errorf("Expected 0 tasks when checkpoint not found, got %d", len(filtered))
 	}
 }
+
+// TestExecuteTaskContextCancellation tests that a cancelled context stops executeTask
+func TestExecuteTaskContextCancellation(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.Config{
+		Project: config.ProjectConfig{
+			Path:       tmpDir,
+			Name:       "test",
+			TechStack:  "Go",
+			MainBranch: "main",
+		},
+		Verification: config.VerificationConfig{
+			Command:        "echo 'verification passed'",
+			TimeoutSeconds: 10,
+		},
+		CLI: config.CLIConfig{
+			Agents: map[string]*config.AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple": "test-model",
+					},
+				},
+			},
+		},
+		Execution: config.ExecutionConfig{
+			MaxAttempts:   3,
+			AutoCommit:    false,
+			HaltOnFailure: false,
+		},
+	}
+
+	store := storage.NewStorage(cfg)
+
+	task := &storage.Task{
+		ID:          "1.1",
+		Title:       "Test Task",
+		Status:      "pending",
+		Complexity:  "simple",
+		Description: "Test description",
+		Metadata: storage.TaskMetadata{
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			MaxAttempts: 3,
+		},
+		Execution: storage.TaskExecution{
+			Attempts: []storage.Attempt{},
+		},
+	}
+
+	if err := store.SaveTask(task); err != nil {
+		t.Fatalf("Failed to save task: %v", err)
+	}
+
+	runner := &mockAgentRunner{
+		shouldSucceed: true,
+		shouldError:   false,
+	}
+
+	// Cancel the context before calling executeTask
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	success, err := executeTask(ctx, cfg, store, runner, task, "test-model", newPlainNotifier(), &ui.UsageStats{})
+
+	if err != nil {
+		t.Fatalf("executeTask returned unexpected error: %v", err)
+	}
+
+	// With a pre-cancelled context, executeTask should return false without executing
+	if success {
+		t.Errorf("Expected task to not succeed when context is cancelled")
+	}
+}

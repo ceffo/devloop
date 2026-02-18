@@ -48,7 +48,7 @@ Examples:
 				return fmt.Errorf("no previous session found - run 'devloop run' to start a new session")
 			}
 
-			return executor.ExecuteDevLoop(cfg, "", true, dryRun, agentName)
+			return executor.ExecuteDevLoop(cmd.Context(), cfg, "", true, dryRun, agentName)
 		},
 	}
 

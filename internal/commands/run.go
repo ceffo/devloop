@@ -74,7 +74,7 @@ Examples:
 			shouldResume := continueSession || resumeSession
 
 			// Execute dev loop
-			err = executor.ExecuteDevLoop(cfg, taskID, shouldResume, dryRun, agentName)
+			err = executor.ExecuteDevLoop(cmd.Context(), cfg, taskID, shouldResume, dryRun, agentName)
 			if err != nil {
 				return err
 			}
