@@ -8,6 +8,11 @@ devloop is a Go-based agent-driven development workflow system. It replaces bash
 
 **Tech Stack:** Go 1.21+, Cobra CLI framework, JSONL storage
 
+## AI CLI Tools
+
+- **Claude**: `claude --model MODEL --dangerously-skip-permissions -p PROMPT`
+- **Copilot**: `copilot --model MODEL --allow-all -p PROMPT`
+
 ## Build, Test, and Commands
 
 ```bash

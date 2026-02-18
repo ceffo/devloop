@@ -70,28 +70,50 @@ func TestNewAgentRunner(t *testing.T) {
 	}
 }
 
-func TestCopilotRunner_Run(t *testing.T) {
+func TestCopilotRunner_Run_LogFileCreation(t *testing.T) {
 	runner := NewCopilotRunner()
 	tempDir := t.TempDir()
-	logPath := filepath.Join(tempDir, "test.log")
+	logPath := filepath.Join(tempDir, "logs", "test.log")
 
-	result, err := runner.Run("test-model", "test prompt", logPath)
-
-	// Should return an error since it's not implemented
-	if err == nil {
-		t.Error("CopilotRunner.Run expected error but got none")
-	}
+	// copilot binary may not be in PATH or may fail with test args,
+	// but the log file should still be created.
+	result, _ := runner.Run("test-model", "test prompt", logPath)
 
 	if result == nil {
 		t.Fatal("CopilotRunner.Run returned nil result")
 	}
 
-	if result.Success {
-		t.Error("CopilotRunner.Run should not succeed (stub implementation)")
+	// Check that log file was created
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		t.Error("CopilotRunner.Run did not create log file")
 	}
 
-	if result.Error == nil {
-		t.Error("CopilotRunner.Run result should have Error set")
+	if result.LogPath != logPath {
+		t.Errorf("Result.LogPath = %q, want %q", result.LogPath, logPath)
+	}
+
+	// Read log file content
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("Failed to read log file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	expectedHeaders := []string{
+		"=== Copilot Agent Execution ===",
+		"Timestamp:",
+		"Model: test-model",
+		"Log Path:",
+		"=== Prompt ===",
+		"test prompt",
+		"=== Output ===",
+	}
+
+	for _, header := range expectedHeaders {
+		if !strings.Contains(contentStr, header) {
+			t.Errorf("Log file missing expected header: %q", header)
+		}
 	}
 }
 
