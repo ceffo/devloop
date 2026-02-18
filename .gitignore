@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-devloop
+/devloop
 
 # Test binary, built with `go test -c`
 *.test
