@@ -47,7 +47,6 @@ func TestDryRunFlagExists(t *testing.T) {
 		ResumeCmd(),
 		InitCmd(),
 		ArchiveCmd(),
-		MigrateCmd(),
 	}
 
 	for _, cmd := range cmds {
@@ -159,19 +158,6 @@ func TestArchiveDryRun(t *testing.T) {
 	entries, _ := os.ReadDir(filepath.Join(devloopDir, "archive"))
 	if len(entries) != 0 {
 		t.Errorf("expected no archive files in dry-run mode, got %d", len(entries))
-	}
-}
-
-// TestMigrateIdsDryRun verifies that 'migrate-ids --dry-run' delegates DryRun=true.
-func TestMigrateIdsDryRun(t *testing.T) {
-	cmd := MigrateCmd()
-	root := setupDryRunTestRoot(cmd)
-	f := root.PersistentFlags().Lookup("dry-run")
-	if f == nil {
-		t.Fatal("--dry-run flag not found")
-	}
-	if f.DefValue != "false" {
-		t.Errorf("expected default false, got %s", f.DefValue)
 	}
 }
 

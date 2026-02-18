@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/ceffo/devloop/internal/config"
 )
 
 // DetectIDFormat returns "hierarchical" or "jira" based on ID format
@@ -41,67 +39,6 @@ func IsValidJiraID(id string) bool {
 	pattern := `^[A-Z]+[A-Z0-9]*-\d+$`
 	matched, _ := regexp.MatchString(pattern, id)
 	return matched
-}
-
-// ValidateTaskID validates ID matches configured format
-func ValidateTaskID(id string, cfg *config.Config) error {
-	format := cfg.Project.TaskIDFormat
-	if format == "" {
-		// Auto-detect from existing format
-		detectedFormat := DetectIDFormat(id)
-		if detectedFormat == "unknown" {
-			return fmt.Errorf("invalid task ID format: %q", id)
-		}
-		return nil
-	}
-
-	switch format {
-	case "hierarchical":
-		if !IsValidHierarchicalID(id) {
-			return fmt.Errorf("invalid hierarchical task ID: %q (expected format: N.N)", id)
-		}
-	case "jira":
-		if !IsValidJiraID(id) {
-			return fmt.Errorf("invalid JIRA task ID: %q (expected format: PREFIX-N)", id)
-		}
-		// Check prefix matches if one is configured
-		if cfg.Project.TaskIDPrefix != "" {
-			if !strings.HasPrefix(id, cfg.Project.TaskIDPrefix+"-") {
-				return fmt.Errorf("invalid JIRA prefix: %q doesn't start with %q", id, cfg.Project.TaskIDPrefix)
-			}
-		}
-	default:
-		return fmt.Errorf("unknown task ID format: %q", format)
-	}
-
-	return nil
-}
-
-// ValidateBlockedByReferences checks that all blockedBy IDs exist
-func ValidateBlockedByReferences(task *Task, store *Storage) error {
-	if len(task.BlockedBy) == 0 {
-		return nil
-	}
-
-	tasks, err := store.LoadTasks()
-	if err != nil {
-		return err
-	}
-
-	// Build map of existing IDs
-	existingIDs := make(map[string]bool)
-	for _, t := range tasks {
-		existingIDs[t.ID] = true
-	}
-
-	// Check each blockedBy reference
-	for _, blockedID := range task.BlockedBy {
-		if !existingIDs[blockedID] {
-			return fmt.Errorf("task %q references non-existent blocked-by task %q", task.ID, blockedID)
-		}
-	}
-
-	return nil
 }
 
 // CompareTaskIDsUniversal handles both hierarchical and JIRA IDs for sorting

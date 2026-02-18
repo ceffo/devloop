@@ -38,11 +38,6 @@
     "auto_commit": true,
     "commit_format": "task {task_id}: {title}"
   },
-  "files": {
-    "prd": "docs/DESIGN.md",
-    "tasks": "docs/TASKS.md",
-    "todo": ".todo/TODO.md"
-  },
   "archival": {
     "auto_archive": true
   },

@@ -20,11 +20,11 @@ type mockAgentRunner struct {
 	errorMessage  string
 }
 
-func (m *mockAgentRunner) Run(model, prompt, logPath string) (*AgentResult, error) {
+func (m *mockAgentRunner) Run(model, prompt, logPath string) (*agent.AgentResult, error) {
 	return m.RunWithOutput(model, prompt, logPath, nil)
 }
 
-func (m *mockAgentRunner) RunWithOutput(model, prompt, logPath string, outputFn agent.OutputCallback) (*AgentResult, error) {
+func (m *mockAgentRunner) RunWithOutput(model, prompt, logPath string, outputFn agent.OutputCallback) (*agent.AgentResult, error) {
 	// Create log directory and file
 	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
 		return nil, err
@@ -37,7 +37,7 @@ func (m *mockAgentRunner) RunWithOutput(model, prompt, logPath string, outputFn 
 		outputFn("Mock agent output")
 	}
 
-	result := &AgentResult{
+	result := &agent.AgentResult{
 		LogPath: logPath,
 		Output:  "Mock agent output",
 	}
