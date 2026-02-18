@@ -76,17 +76,8 @@ func (c *Config) Validate() error {
 				}
 			}
 		}
-	} else if c.CLI.Tool != "" {
-		// Old format: top-level tool and models (for backwards compatibility)
-		// Check model names are valid
-		for complexity, model := range c.CLI.Models {
-			if !knownModels[model] {
-				return fmt.Errorf("cli.models.%s has invalid model name: %s", complexity, model)
-			}
-		}
 	} else {
-		// No agents and no tool configured
-		return errors.New("cli must have either 'agents' (new format) or 'tool' with 'models' (old format)")
+		return errors.New("cli.agents must be configured")
 	}
 
 	// Check max_attempts > 0

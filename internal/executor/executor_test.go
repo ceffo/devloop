@@ -78,9 +78,13 @@ func TestExecuteTaskSuccess(t *testing.T) {
 			TimeoutSeconds: 10,
 		},
 		CLI: config.CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple": "test-model",
+			Agents: map[string]*config.AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple": "test-model",
+					},
+				},
 			},
 		},
 		Execution: config.ExecutionConfig{
@@ -170,9 +174,13 @@ func TestExecuteTaskRetry(t *testing.T) {
 			TimeoutSeconds: 10,
 		},
 		CLI: config.CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple": "test-model",
+			Agents: map[string]*config.AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple": "test-model",
+					},
+				},
 			},
 		},
 		Execution: config.ExecutionConfig{
@@ -258,9 +266,13 @@ func TestExecuteTaskAgentError(t *testing.T) {
 			TimeoutSeconds: 10,
 		},
 		CLI: config.CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple": "test-model",
+			Agents: map[string]*config.AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple": "test-model",
+					},
+				},
 			},
 		},
 		Execution: config.ExecutionConfig{

@@ -24,11 +24,15 @@ func TestValidate_ValidConfig(t *testing.T) {
 			TimeoutSeconds: 300,
 		},
 		CLI: CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple":   "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex":  "claude-opus-4-6",
+			Agents: map[string]*AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple":   "claude-haiku-4-5-20251001",
+						"moderate": "claude-sonnet-4-5-20250929",
+						"complex":  "claude-opus-4-6",
+					},
+				},
 			},
 		},
 		Execution: ExecutionConfig{

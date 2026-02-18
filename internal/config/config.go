@@ -61,11 +61,6 @@ func (a *AgentConfig) GetModel(complexity string) (string, error) {
 // Supports multiple agents; the active agent is selected via --agent flag at runtime
 type CLIConfig struct {
 	Agents map[string]*AgentConfig `json:"agents,omitempty"`
-
-	// Deprecated fields for backwards compatibility
-	// These are converted to the agents map on load
-	Tool   string            `json:"tool,omitempty"`
-	Models map[string]string `json:"models,omitempty"`
 }
 
 // ExecutionConfig controls task execution behavior
@@ -89,14 +84,6 @@ type PromptsConfig struct {
 // GetAgent returns the AgentConfig for the given agent name
 // If the agent doesn't exist, returns an error with helpful message listing available agents
 func (c *CLIConfig) GetAgent(name string) (*AgentConfig, error) {
-	// If using legacy format (agents map is empty), create a default agent from old fields
-	if len(c.Agents) == 0 && c.Tool != "" {
-		return &AgentConfig{
-			Tool:   c.Tool,
-			Models: c.Models,
-		}, nil
-	}
-
 	// If requesting specific agent, return it
 	if name != "" {
 		if agent, exists := c.Agents[name]; exists {
@@ -138,33 +125,6 @@ func (c *CLIConfig) GetDefaultAgentName() string {
 	return ""
 }
 
-// migrateOldFormat converts old config format (with top-level tool/models) to new format (with agents map)
-// Returns true if migration was performed
-func (c *CLIConfig) migrateOldFormat() bool {
-	// If already in new format (agents map exists), no migration needed
-	if len(c.Agents) > 0 {
-		return false
-	}
-
-	// If old format fields are empty, nothing to migrate
-	if c.Tool == "" {
-		return false
-	}
-
-	// Migrate old format to new format
-	c.Agents = map[string]*AgentConfig{
-		"default": {
-			Tool:   c.Tool,
-			Models: c.Models,
-		},
-	}
-
-	// Keep old fields for backwards compatibility on save
-	// They'll be preserved as-is in JSON
-
-	return true
-}
-
 // LoadConfig loads configuration from a JSON file
 // Returns a Config with sensible defaults if the file doesn't exist
 func LoadConfig(path string) (*Config, error) {
@@ -185,9 +145,6 @@ func LoadConfig(path string) (*Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config JSON: %w", err)
 	}
-
-	// Migrate old format to new format if needed
-	cfg.CLI.migrateOldFormat()
 
 	// Apply defaults for missing fields
 	applyDefaults(&cfg)
@@ -244,13 +201,6 @@ func getDefaultConfig() *Config {
 					},
 				},
 			},
-			// Keep legacy fields for backwards compatibility
-			Tool: "claude",
-			Models: map[string]string{
-				"simple":   "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex":  "claude-opus-4-6",
-			},
 		},
 		Execution: ExecutionConfig{
 			MaxAttempts:   2,
@@ -296,14 +246,6 @@ func applyDefaults(cfg *Config) {
 	// Apply CLI defaults
 	if len(cfg.CLI.Agents) == 0 {
 		cfg.CLI.Agents = defaults.CLI.Agents
-	}
-
-	// Also set legacy fields for backwards compatibility
-	if cfg.CLI.Tool == "" {
-		cfg.CLI.Tool = defaults.CLI.Tool
-	}
-	if cfg.CLI.Models == nil {
-		cfg.CLI.Models = defaults.CLI.Models
 	}
 
 	if cfg.Execution.MaxAttempts <= 0 {

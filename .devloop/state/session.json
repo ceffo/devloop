@@ -1,33 +1,47 @@
 {
-  "id": "356e820f-b4cb-41fc-9dc2-eb37fb11f248",
-  "started_at": "2026-02-17T15:48:42.952924913-05:00",
-  "last_checkpoint": "DEV-17",
-  "tasks_completed": [
-    "DEV-16",
-    "DEV-18",
-    "DEV-17"
+  "id": "63a710d6-ffe1-4e1b-a1f4-e7c8d7c7a467",
+  "started_at": "2026-02-18T13:35:56.256884597-05:00",
+  "last_checkpoint": "DEV-19",
+  "tasks_completed": [],
+  "tasks_failed": [
+    "DEV-19"
   ],
-  "tasks_failed": [],
-  "agent_name": "claude",
+  "agent_name": "copilot",
   "model_map": {
-    "complex": "claude-opus-4-6",
-    "moderate": "claude-sonnet-4-5-20250929",
-    "simple": "claude-haiku-4-5-20251001"
+    "complex": "claude-opus-4.6",
+    "moderate": "claude-sonnet-4.5",
+    "simple": "claude-haiku-4.5"
   },
   "task_snapshot": [
     {
-      "id": "DEV-16",
-      "title": "Simplify CLI usage output text",
+      "id": "DEV-19",
+      "title": "Streamline agent instruction files to forward to shared guide",
       "status": "pending",
-      "complexity": "simple",
-      "wave": 1
+      "complexity": "simple"
     },
     {
-      "id": "DEV-18",
-      "title": "Style task list output with charmbracelet widgets",
+      "id": "DEV-20",
+      "title": "Add --dry-run flag support to all commands",
       "status": "pending",
-      "complexity": "moderate",
-      "wave": 1
+      "complexity": "moderate"
+    },
+    {
+      "id": "DEV-21",
+      "title": "Add context-based cancellation and graceful shutdown",
+      "status": "pending",
+      "complexity": "moderate"
+    },
+    {
+      "id": "DEV-22",
+      "title": "Add golangci-lint configuration and fix lint issues",
+      "status": "pending",
+      "complexity": "moderate"
+    },
+    {
+      "id": "DEV-24",
+      "title": "Clean out legacy config items and task migration code",
+      "status": "pending",
+      "complexity": "moderate"
     }
   ]
 }

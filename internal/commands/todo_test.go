@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/testutils"
 )
 
 func TestProcessCmd(t *testing.T) {
@@ -17,32 +18,8 @@ func TestProcessCmd(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a valid config
-	cfg := &config.Config{
-		Version: "1.0",
-		Project: config.ProjectConfig{
-			Name:       "test-project",
-			Path:       tmpDir,
-			TechStack:  "Go",
-			MainBranch: "main",
-		},
-		Verification: config.VerificationConfig{
-			Command:        "go test ./...",
-			TimeoutSeconds: 300,
-		},
-		CLI: config.CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple":   "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex":  "claude-opus-4-6",
-			},
-		},
-		Execution: config.ExecutionConfig{
-			MaxAttempts:   2,
-			HaltOnFailure: true,
-			AutoCommit:    true,
-		},
-	}
+	cfg := testutils.MakeTestConfig(tmpDir)
+	cfg.Verification.Command = "go test ./..."
 
 	// Save config
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -100,32 +77,8 @@ func TestProcessTodoCmd_MissingFile(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a valid config
-	cfg := &config.Config{
-		Version: "1.0",
-		Project: config.ProjectConfig{
-			Name:       "test-project",
-			Path:       tmpDir,
-			TechStack:  "Go",
-			MainBranch: "main",
-		},
-		Verification: config.VerificationConfig{
-			Command:        "go test ./...",
-			TimeoutSeconds: 300,
-		},
-		CLI: config.CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple":   "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex":  "claude-opus-4-6",
-			},
-		},
-		Execution: config.ExecutionConfig{
-			MaxAttempts:   2,
-			HaltOnFailure: true,
-			AutoCommit:    true,
-		},
-	}
+	cfg := testutils.MakeTestConfig(tmpDir)
+	cfg.Verification.Command = "go test ./..."
 
 	// Save config
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -160,32 +113,8 @@ func TestProcessTodoCmd_EmptyFile(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a valid config
-	cfg := &config.Config{
-		Version: "1.0",
-		Project: config.ProjectConfig{
-			Name:       "test-project",
-			Path:       tmpDir,
-			TechStack:  "Go",
-			MainBranch: "main",
-		},
-		Verification: config.VerificationConfig{
-			Command:        "go test ./...",
-			TimeoutSeconds: 300,
-		},
-		CLI: config.CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple":   "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex":  "claude-opus-4-6",
-			},
-		},
-		Execution: config.ExecutionConfig{
-			MaxAttempts:   2,
-			HaltOnFailure: true,
-			AutoCommit:    true,
-		},
-	}
+	cfg := testutils.MakeTestConfig(tmpDir)
+	cfg.Verification.Command = "go test ./..."
 
 	// Save config
 	configPath := filepath.Join(tmpDir, "config.json")

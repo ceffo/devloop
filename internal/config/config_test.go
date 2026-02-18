@@ -27,8 +27,8 @@ func TestLoadConfig_MissingFile(t *testing.T) {
 		t.Errorf("Expected max_attempts 2, got %d", cfg.Execution.MaxAttempts)
 	}
 
-	if cfg.CLI.Tool != "claude" {
-		t.Errorf("Expected CLI tool 'claude', got '%s'", cfg.CLI.Tool)
+	if cfg.CLI.GetDefaultAgentName() != "claude" {
+		t.Errorf("Expected default agent 'claude', got '%s'", cfg.CLI.GetDefaultAgentName())
 	}
 }
 
@@ -56,11 +56,15 @@ func TestSaveAndLoadConfig(t *testing.T) {
 			TimeoutSeconds: 300,
 		},
 		CLI: CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple":   "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex":  "claude-opus-4-6",
+			Agents: map[string]*AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple":   "claude-haiku-4-5-20251001",
+						"moderate": "claude-sonnet-4-5-20250929",
+						"complex":  "claude-opus-4-6",
+					},
+				},
 			},
 		},
 		Execution: ExecutionConfig{
@@ -222,8 +226,8 @@ func TestApplyDefaults(t *testing.T) {
 		t.Errorf("Expected main_branch to default to 'main', got '%s'", cfg.Project.MainBranch)
 	}
 
-	if cfg.CLI.Tool != "claude" {
-		t.Errorf("Expected CLI tool to default to 'claude', got '%s'", cfg.CLI.Tool)
+	if cfg.CLI.GetDefaultAgentName() != "claude" {
+		t.Errorf("Expected default agent to be 'claude', got '%s'", cfg.CLI.GetDefaultAgentName())
 	}
 }
 
@@ -361,98 +365,6 @@ func TestGetDefaultAgentName_Alphabetical(t *testing.T) {
 	name := cfg.CLI.GetDefaultAgentName()
 	if name != "alpha" {
 		t.Errorf("Expected 'alpha' (first alphabetically), got '%s'", name)
-	}
-}
-
-func TestMigrateOldFormat(t *testing.T) {
-	cli := CLIConfig{
-		Tool: "claude",
-		Models: map[string]string{
-			"simple":   "claude-haiku-4-5-20251001",
-			"moderate": "claude-sonnet-4-5-20250929",
-			"complex":  "claude-opus-4-6",
-		},
-	}
-
-	migrated := cli.migrateOldFormat()
-	if !migrated {
-		t.Error("migrateOldFormat should return true for old format")
-	}
-
-	if agent, exists := cli.Agents["default"]; !exists || agent.Tool != "claude" {
-		t.Error("Migration should create 'default' agent with old settings")
-	}
-}
-
-func TestMigrateOldFormat_AlreadyNew(t *testing.T) {
-	cli := CLIConfig{
-		Agents: map[string]*AgentConfig{
-			"claude": {Tool: "claude", Models: map[string]string{"simple": "claude-haiku-4-5-20251001"}},
-		},
-	}
-
-	migrated := cli.migrateOldFormat()
-	if migrated {
-		t.Error("migrateOldFormat should return false for already new format")
-	}
-}
-
-func TestLoadOldFormatConfig(t *testing.T) {
-	// Create temp directory
-	tempDir, err := os.MkdirTemp("", "devloop-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	configPath := filepath.Join(tempDir, "config.json")
-
-	// Create old format config
-	oldConfigJSON := `{
-		"version": "1.0",
-		"project": {
-			"name": "test",
-			"path": "/tmp",
-			"tech_stack": "Go",
-			"main_branch": "main"
-		},
-		"verification": {
-			"command": "go test",
-			"timeout_seconds": 300
-		},
-		"cli": {
-			"tool": "claude",
-			"models": {
-				"simple": "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex": "claude-opus-4-6"
-			}
-		},
-		"execution": {
-			"max_attempts": 2,
-			"halt_on_failure": true,
-			"auto_commit": true
-		}
-	}`
-
-	if err := os.WriteFile(configPath, []byte(oldConfigJSON), 0644); err != nil {
-		t.Fatalf("Failed to write test config: %v", err)
-	}
-
-	// Load and verify migration
-	cfg, err := LoadConfig(configPath)
-	if err != nil {
-		t.Fatalf("LoadConfig failed: %v", err)
-	}
-
-	// Should still be able to get agent
-	agent, err := cfg.CLI.GetAgent("")
-	if err != nil {
-		t.Fatalf("GetAgent() after migration failed: %v", err)
-	}
-
-	if agent.Tool != "claude" {
-		t.Errorf("Expected migrated agent tool 'claude', got '%s'", agent.Tool)
 	}
 }
 

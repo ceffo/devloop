@@ -26,11 +26,15 @@ func createTestConfig(t *testing.T) (*config.Config, string) {
 			TimeoutSeconds: 300,
 		},
 		CLI: config.CLIConfig{
-			Tool: "claude",
-			Models: map[string]string{
-				"simple":   "claude-haiku-4-5-20251001",
-				"moderate": "claude-sonnet-4-5-20250929",
-				"complex":  "claude-opus-4-6",
+			Agents: map[string]*config.AgentConfig{
+				"claude": {
+					Tool: "claude",
+					Models: map[string]string{
+						"simple":   "claude-haiku-4-5-20251001",
+						"moderate": "claude-sonnet-4-5-20250929",
+						"complex":  "claude-opus-4-6",
+					},
+				},
 			},
 		},
 		Execution: config.ExecutionConfig{

@@ -105,7 +105,7 @@ func configValidateCmd() *cobra.Command {
 			fmt.Printf("  Path:          %s\n", cfg.Project.Path)
 			fmt.Printf("  Tech Stack:    %s\n", cfg.Project.TechStack)
 			fmt.Printf("  Main Branch:   %s\n", cfg.Project.MainBranch)
-			fmt.Printf("  CLI Tool:      %s\n", cfg.CLI.Tool)
+			fmt.Printf("  Agents:        %s\n", cfg.CLI.GetDefaultAgentName())
 			fmt.Printf("  Max Attempts:  %d\n", cfg.Execution.MaxAttempts)
 			fmt.Printf("  Auto Commit:   %v\n", cfg.Execution.AutoCommit)
 
