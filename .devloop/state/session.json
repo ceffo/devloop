@@ -9,16 +9,10 @@
   "agent_name": "copilot",
   "model_map": {
     "complex": "claude-opus-4.6",
-    "moderate": "claude-sonnet-4.5",
+    "moderate": "claude-sonnet-4.6",
     "simple": "claude-haiku-4.5"
   },
   "task_snapshot": [
-    {
-      "id": "DEV-19",
-      "title": "Streamline agent instruction files to forward to shared guide",
-      "status": "pending",
-      "complexity": "simple"
-    },
     {
       "id": "DEV-20",
       "title": "Add --dry-run flag support to all commands",

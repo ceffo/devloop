@@ -33,6 +33,8 @@ Example:
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+
 	// Get current directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -40,6 +42,25 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	devloopDir := filepath.Join(cwd, ".devloop")
+
+	// Detect project settings
+	projectName := detectProjectName(cwd)
+	techStack := detectTechStack(cwd)
+	configPath := filepath.Join(devloopDir, "config.json")
+
+	if dryRun {
+		fmt.Println("[dry-run] Would initialize devloop in the current project")
+		fmt.Printf("[dry-run] Would create directory: %s\n", devloopDir)
+		fmt.Printf("[dry-run] Would create subdirectories: logs/, archive/, state/\n")
+		fmt.Printf("[dry-run] Would write config to: %s\n", configPath)
+		fmt.Printf("[dry-run] Would write tasks file: %s\n", filepath.Join(devloopDir, "tasks.jsonl"))
+		fmt.Printf("[dry-run] Detected project name: %s\n", projectName)
+		if techStack != "" {
+			fmt.Printf("[dry-run] Detected tech stack: %s\n", techStack)
+		}
+		fmt.Println("[dry-run] No files were created")
+		return nil
+	}
 
 	// Check if .devloop/ already exists
 	if _, err := os.Stat(devloopDir); err == nil {
@@ -70,15 +91,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Detect project settings
-	projectName := detectProjectName(cwd)
-	techStack := detectTechStack(cwd)
-
 	// Generate config with detected values
 	cfg := createInitialConfig(projectName, cwd, techStack)
 
 	// Save config
-	configPath := filepath.Join(devloopDir, "config.json")
 	if err := config.SaveConfig(configPath, cfg); err != nil {
 		spinner.Stop()
 		return err

@@ -502,6 +502,7 @@ Example:
 
 			// Get config path from persistent flags
 			configPath, _ := cmd.Flags().GetString("config")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 			// Load configuration
 			cfg, err := config.LoadConfig(configPath)
@@ -516,6 +517,15 @@ Example:
 			task, err := store.GetTask(taskID)
 			if err != nil {
 				return fmt.Errorf("task not found: %s", taskID)
+			}
+
+			if dryRun {
+				fmt.Printf("[dry-run] Would update task %s status: %s → %s\n",
+					ui.Label(taskID),
+					formatStatus(task.Status),
+					formatStatus(statusFlag))
+				fmt.Println("[dry-run] No changes were saved")
+				return nil
 			}
 
 			// Store old status for confirmation message

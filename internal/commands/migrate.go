@@ -166,8 +166,6 @@ func sortHierarchicalIDs(ids []string) {
 
 // MigrateCmd returns the migrate-ids command
 func MigrateCmd() *cobra.Command {
-	var dryRun bool
-
 	cmd := &cobra.Command{
 		Use:   "migrate-ids",
 		Short: "Migrate task IDs from hierarchical to JIRA format",
@@ -187,6 +185,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config path from persistent flags
 			configPath, _ := cmd.Flags().GetString("config")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 			// Load configuration
 			cfg, err := config.LoadConfig(configPath)
@@ -201,8 +200,6 @@ Examples:
 			return MigrateTaskIDs(cfg, opts)
 		},
 	}
-
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview migration without applying changes")
 
 	return cmd
 }

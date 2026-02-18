@@ -52,6 +52,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			agentName, _ := cmd.Flags().GetString("agent")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
@@ -87,6 +88,12 @@ Examples:
 			}
 
 			displayTasksSummary(tasks)
+
+			if dryRun {
+				fmt.Printf("[dry-run] Would save %d task(s) to storage\n", len(tasks))
+				fmt.Println("[dry-run] No tasks were saved")
+				return nil
+			}
 
 			if !confirmSave(len(tasks)) {
 				fmt.Println("Task processing cancelled.")
@@ -133,6 +140,7 @@ Examples:
 
 			configPath, _ := cmd.Flags().GetString("config")
 			agentName, _ := cmd.Flags().GetString("agent")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
@@ -155,6 +163,12 @@ Examples:
 			}
 
 			displayTasksSummary(tasks)
+
+			if dryRun {
+				fmt.Printf("[dry-run] Would save %d task(s) to storage\n", len(tasks))
+				fmt.Println("[dry-run] No tasks were saved")
+				return nil
+			}
 
 			if !confirmSave(len(tasks)) {
 				fmt.Println("Task processing cancelled.")

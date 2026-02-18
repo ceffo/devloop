@@ -14,7 +14,6 @@ func RunCmd() *cobra.Command {
 		taskID          string
 		continueSession bool
 		resumeSession   bool
-		dryRun          bool
 	)
 
 	cmd := &cobra.Command{
@@ -44,6 +43,21 @@ Examples:
 			// Get config path from persistent flags
 			configPath, _ := cmd.Flags().GetString("config")
 			agentName, _ := cmd.Flags().GetString("agent")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+			if dryRun {
+				fmt.Println("[dry-run] Would execute the development workflow")
+				if taskID != "" {
+					fmt.Printf("[dry-run] Would run specific task: %s\n", taskID)
+				} else {
+					fmt.Println("[dry-run] Would run all pending tasks in order")
+				}
+				if continueSession || resumeSession {
+					fmt.Println("[dry-run] Would resume from last checkpoint")
+				}
+				fmt.Println("[dry-run] No tasks will be executed")
+				return nil
+			}
 
 			// Load configuration
 			cfg, err := config.LoadConfig(configPath)
@@ -73,7 +87,6 @@ Examples:
 	cmd.Flags().StringVar(&taskID, "task", "", "run specific task by ID")
 	cmd.Flags().BoolVar(&continueSession, "continue", false, "resume from last checkpoint")
 	cmd.Flags().BoolVar(&resumeSession, "resume", false, "resume from last checkpoint (alias for --continue)")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be executed without running")
 
 	return cmd
 }

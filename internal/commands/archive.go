@@ -24,6 +24,7 @@ Example:
   devloop archive`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {
@@ -31,7 +32,6 @@ Example:
 			}
 
 			store := storage.NewStorage(cfg)
-			arc := archiver.NewArchiver(cfg, store)
 
 			completedTasks, err := store.QueryTasks(storage.Filter{Status: "completed"})
 			if err != nil {
@@ -43,7 +43,18 @@ Example:
 				return nil
 			}
 
+			if dryRun {
+				fmt.Printf("[dry-run] Would archive %d completed task(s)\n", len(completedTasks))
+				for _, t := range completedTasks {
+					fmt.Printf("[dry-run]   - %s: %s\n", t.ID, t.Title)
+				}
+				fmt.Println("[dry-run] No files were written")
+				return nil
+			}
+
 			fmt.Printf("Archiving %d completed task(s)...\n\n", len(completedTasks))
+
+			arc := archiver.NewArchiver(cfg, store)
 
 			result, err := arc.ExportCompleted()
 			if err != nil {

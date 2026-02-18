@@ -10,8 +10,6 @@ import (
 
 // ResumeCmd returns the resume command
 func ResumeCmd() *cobra.Command {
-	var dryRun bool
-
 	cmd := &cobra.Command{
 		Use:   "resume",
 		Short: "Resume the last execution session from where it left off",
@@ -27,6 +25,13 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			agentName, _ := cmd.Flags().GetString("agent")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+			if dryRun {
+				fmt.Println("[dry-run] Would resume the last execution session from the last checkpoint")
+				fmt.Println("[dry-run] No tasks will be executed")
+				return nil
+			}
 
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {
@@ -46,8 +51,6 @@ Examples:
 			return executor.ExecuteDevLoop(cfg, "", true, dryRun, agentName)
 		},
 	}
-
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be executed without running")
 
 	return cmd
 }
