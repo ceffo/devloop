@@ -304,7 +304,7 @@ func getReadyTasksForExecution(store *storage.Storage, filter storage.Filter, ta
 // executeTask executes a single task with retry logic
 // Returns (success, error)
 // sessionStats is updated in place and UsageStatsUpdate is called after each agent call.
-func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.AgentRunner, task *storage.Task, model string, notifier Notifier, sessionStats *ui.UsageStats) (bool, error) {
+func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.Runner, task *storage.Task, model string, notifier Notifier, sessionStats *ui.UsageStats) (bool, error) {
 	// Mark task as in progress
 	task.Status = "in_progress"
 	task.Metadata.UpdatedAt = time.Now()

@@ -157,7 +157,7 @@ func (n *plainNotifier) Init(tasks []*storage.Task, sessionID, agentName string)
 	ui.PlainTaskList(items, sessionID, agentName)
 }
 
-func (n *plainNotifier) TaskStarted(taskID string, attempt, maxAttempts int) {
+func (n *plainNotifier) TaskStarted(taskID string, attempt, _ int) {
 	ui.PlainTaskUpdate(taskID, ui.StatusRunning, attempt)
 }
 
@@ -169,7 +169,7 @@ func (n *plainNotifier) TaskFailed(taskID string) {
 	ui.PlainTaskUpdate(taskID, ui.StatusFailed, 0)
 }
 
-func (n *plainNotifier) AgentStatusUpdate(agentName, modelID string) {
+func (n *plainNotifier) AgentStatusUpdate(_, _ string) {
 	// Plain notifier doesn't need to update anything since status is shown inline
 }
 

@@ -22,7 +22,7 @@ Examples:
   devloop resume
   devloop --agent claude resume
   devloop resume --dry-run`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+RunE: func(cmd *cobra.Command, _ []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			agentName, _ := cmd.Flags().GetString("agent")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")

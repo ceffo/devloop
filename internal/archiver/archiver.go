@@ -1,3 +1,4 @@
+// Package archiver handles archiving of completed tasks.
 package archiver
 
 import (

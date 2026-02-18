@@ -39,7 +39,7 @@ Examples:
   devloop --agent claude run
   devloop run --continue
   devloop run --dry-run`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+			RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get config path from persistent flags
 			configPath, _ := cmd.Flags().GetString("config")
 			agentName, _ := cmd.Flags().GetString("agent")

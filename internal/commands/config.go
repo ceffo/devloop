@@ -37,7 +37,7 @@ func configShowCmd() *cobra.Command {
 		Use:   "show",
 		Short: "Display current configuration",
 		Long:  `Pretty-print the current devloop configuration with colors.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+			RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get config path from global flag
 			configPath, err := cmd.Flags().GetString("config")
 			if err != nil {
@@ -74,7 +74,7 @@ func configValidateCmd() *cobra.Command {
 		Use:   "validate",
 		Short: "Validate configuration file",
 		Long:  `Load configuration and validate all required fields and constraints.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+			RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get config path from global flag
 			configPath, err := cmd.Flags().GetString("config")
 			if err != nil {

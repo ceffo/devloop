@@ -66,8 +66,7 @@ Examples:
   devloop tasks list --status pending
   devloop tasks list --complexity moderate
   devloop tasks list --tags backend,api`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get config path from persistent flags
+			RunE: func(cmd *cobra.Command, _ []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 
 			// Load configuration
@@ -453,7 +452,7 @@ func displayTaskDetails(task *storage.Task) {
 }
 
 // formatAttemptResult formats the attempt result with color coding
-func formatAttemptResult(result string, success bool) string {
+func formatAttemptResult(result string, _ bool) string {
 	return ui.Result(result)
 }
 

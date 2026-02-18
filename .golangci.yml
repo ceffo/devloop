@@ -11,6 +11,7 @@ linters:
     - ineffassign # Detects ineffectual assignments
     - unused      # Checks for unused code
     - gocritic    # Opinionated linter
+    - revive
   settings:
     govet:
       enable-all: true
@@ -34,6 +35,14 @@ linters:
       - path: "_test\\.go"
         linters: [errcheck]
         text: "Error return value of `storage\\.SaveTask` is not checked"
+      # Test files don't require package comments
+      - path: "_test\\.go"
+        linters: [revive]
+        text: "package-comments"
+      # Test function signatures (t *testing.T) are conventional even when unused
+      - path: "_test\\.go"
+        linters: [revive]
+        text: "unused-parameter"
 
 issues:
   max-issues-per-linter: 0

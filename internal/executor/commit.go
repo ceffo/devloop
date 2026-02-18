@@ -1,3 +1,4 @@
+// Package executor manages task execution, retries, and session handling.
 package executor
 
 import (

@@ -1,3 +1,4 @@
+// Package agent provides interfaces and implementations for running AI CLI tools.
 package agent
 
 import (
@@ -15,16 +16,16 @@ import (
 // It is called from a goroutine; implementations must be goroutine-safe.
 type OutputCallback func(line string)
 
-// AgentRunner defines the interface for running AI CLI tools
-type AgentRunner interface {
-	Run(model, prompt, logPath string) (*AgentResult, error)
+// Runner defines the interface for running AI CLI tools
+type Runner interface {
+	Run(model, prompt, logPath string) (*Result, error)
 	// RunWithOutput is like Run but calls outputFn for each output line in real time.
 	// Pass nil for outputFn to behave like Run.
-	RunWithOutput(model, prompt, logPath string, outputFn OutputCallback) (*AgentResult, error)
+	RunWithOutput(model, prompt, logPath string, outputFn OutputCallback) (*Result, error)
 }
 
-// AgentResult contains the result of an agent execution
-type AgentResult struct {
+// Result contains the result of an agent execution
+type Result struct {
 	Success bool
 	Output  string
 	LogPath string
@@ -34,8 +35,8 @@ type AgentResult struct {
 // runCLIAgent is the shared implementation for running any AI CLI agent.
 // binary is the CLI binary name, cmdArgs builds the command arguments from model and prompt.
 // header is the label used in the log file header (e.g. "Claude", "Copilot").
-func runCLIAgent(binary, header, model, prompt, logPath string, buildArgs func(model, prompt string) []string, outputFn OutputCallback) (*AgentResult, error) {
-	result := &AgentResult{LogPath: logPath}
+func runCLIAgent(binary, header, model, prompt, logPath string, buildArgs func(model, prompt string) []string, outputFn OutputCallback) (*Result, error) {
+	result := &Result{LogPath: logPath}
 
 	logDir := filepath.Dir(logPath)
 	if err := os.MkdirAll(logDir, 0755); err != nil {
@@ -107,7 +108,7 @@ func runCLIAgent(binary, header, model, prompt, logPath string, buildArgs func(m
 	return result, nil
 }
 
-// ClaudeRunner implements AgentRunner for the Claude CLI
+// ClaudeRunner implements Runner for the Claude CLI
 type ClaudeRunner struct{}
 
 // NewClaudeRunner creates a new ClaudeRunner
@@ -117,18 +118,18 @@ func NewClaudeRunner() *ClaudeRunner {
 
 // Run executes the Claude CLI with the given model and prompt.
 // Logs are written to logPath.
-func (c *ClaudeRunner) Run(model, prompt, logPath string) (*AgentResult, error) {
+func (c *ClaudeRunner) Run(model, prompt, logPath string) (*Result, error) {
 	return c.RunWithOutput(model, prompt, logPath, nil)
 }
 
 // RunWithOutput executes the Claude CLI, streaming each output line to outputFn.
-func (c *ClaudeRunner) RunWithOutput(model, prompt, logPath string, outputFn OutputCallback) (*AgentResult, error) {
+func (c *ClaudeRunner) RunWithOutput(model, prompt, logPath string, outputFn OutputCallback) (*Result, error) {
 	return runCLIAgent("claude", "Claude", model, prompt, logPath, func(model, prompt string) []string {
 		return []string{"--model", model, "--dangerously-skip-permissions", "-p", prompt}
 	}, outputFn)
 }
 
-// CopilotRunner implements AgentRunner for GitHub Copilot CLI
+// CopilotRunner implements Runner for GitHub Copilot CLI
 type CopilotRunner struct{}
 
 // NewCopilotRunner creates a new CopilotRunner
@@ -137,19 +138,19 @@ func NewCopilotRunner() *CopilotRunner {
 }
 
 // Run executes the Copilot CLI with the given model and prompt.
-func (c *CopilotRunner) Run(model, prompt, logPath string) (*AgentResult, error) {
+func (c *CopilotRunner) Run(model, prompt, logPath string) (*Result, error) {
 	return c.RunWithOutput(model, prompt, logPath, nil)
 }
 
 // RunWithOutput executes the Copilot CLI, streaming each output line to outputFn.
-func (c *CopilotRunner) RunWithOutput(model, prompt, logPath string, outputFn OutputCallback) (*AgentResult, error) {
+func (c *CopilotRunner) RunWithOutput(model, prompt, logPath string, outputFn OutputCallback) (*Result, error) {
 	return runCLIAgent("copilot", "Copilot", model, prompt, logPath, func(model, prompt string) []string {
 		return []string{"--model", model, "--allow-all", "-p", prompt}
 	}, outputFn)
 }
 
-// NewAgentRunner creates an appropriate AgentRunner based on the tool name
-func NewAgentRunner(tool string) (AgentRunner, error) {
+// NewAgentRunner creates an appropriate Runner based on the tool name
+func NewAgentRunner(tool string) (Runner, error) {
 	switch tool {
 	case "claude":
 		return NewClaudeRunner(), nil

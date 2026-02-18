@@ -1,3 +1,4 @@
+// Package config handles loading, parsing, and validating devloop configuration.
 package config
 
 import (

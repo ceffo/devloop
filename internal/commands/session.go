@@ -23,7 +23,7 @@ Subcommands:
 Examples:
   devloop session status
   devloop session recover`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+			RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
 	}
@@ -39,8 +39,8 @@ func sessionStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
 		Short: "Show current session status",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, _ := cmd.Flags().GetString("config")
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				configPath, _ := cmd.Flags().GetString("config")
 
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {
@@ -90,9 +90,9 @@ func sessionRecoverCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "recover",
 		Short: "Recover execution from last checkpoint",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, _ := cmd.Flags().GetString("config")
-			agentName, _ := cmd.Flags().GetString("agent")
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				configPath, _ := cmd.Flags().GetString("config")
+				agentName, _ := cmd.Flags().GetString("agent")
 
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {

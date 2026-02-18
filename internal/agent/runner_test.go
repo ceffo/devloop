@@ -192,8 +192,8 @@ func TestClaudeRunner_Run_DirectoryCreation(t *testing.T) {
 }
 
 func TestAgentResult(t *testing.T) {
-	// Test that AgentResult struct can be instantiated and has expected fields
-	result := &AgentResult{
+	// Test that Result struct can be instantiated and has expected fields
+	result := &Result{
 		Success: true,
 		Output:  "test output",
 		LogPath: "/path/to/log",
@@ -201,26 +201,26 @@ func TestAgentResult(t *testing.T) {
 	}
 
 	if !result.Success {
-		t.Error("AgentResult.Success not set correctly")
+		t.Error("Result.Success not set correctly")
 	}
 
 	if result.Output != "test output" {
-		t.Errorf("AgentResult.Output = %q, want %q", result.Output, "test output")
+		t.Errorf("Result.Output = %q, want %q", result.Output, "test output")
 	}
 
 	if result.LogPath != "/path/to/log" {
-		t.Errorf("AgentResult.LogPath = %q, want %q", result.LogPath, "/path/to/log")
+		t.Errorf("Result.LogPath = %q, want %q", result.LogPath, "/path/to/log")
 	}
 
 	if result.Error != nil {
-		t.Errorf("AgentResult.Error = %v, want nil", result.Error)
+		t.Errorf("Result.Error = %v, want nil", result.Error)
 	}
 }
 
 func TestAgentRunner_Interface(t *testing.T) {
-	// Verify that ClaudeRunner implements AgentRunner interface
-	var _ AgentRunner = (*ClaudeRunner)(nil)
+	// Verify that ClaudeRunner implements Runner interface
+	var _ Runner = (*ClaudeRunner)(nil)
 
-	// Verify that CopilotRunner implements AgentRunner interface
-	var _ AgentRunner = (*CopilotRunner)(nil)
+	// Verify that CopilotRunner implements Runner interface
+	var _ Runner = (*CopilotRunner)(nil)
 }

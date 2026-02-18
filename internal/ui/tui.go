@@ -11,6 +11,7 @@ import (
 // TaskStatus represents a task's current status in the TUI.
 type TaskStatus string
 
+// Task status constants representing the lifecycle states of a task.
 const (
 	StatusPending    TaskStatus = "pending"
 	StatusRunning    TaskStatus = "running"

@@ -1,3 +1,4 @@
+// Package storage provides task persistence and querying.
 package storage
 
 // Filter defines optional criteria for querying tasks

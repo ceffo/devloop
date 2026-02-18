@@ -7,8 +7,8 @@ import (
 	"github.com/ceffo/devloop/internal/agent"
 )
 
-// Example demonstrates how to use the AgentRunner interface
-func ExampleAgentRunner() {
+// Example demonstrates how to use the Runner interface
+func ExampleRunner() {
 	// Create a Claude runner
 	runner := agent.NewClaudeRunner()
 

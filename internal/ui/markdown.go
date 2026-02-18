@@ -1,3 +1,4 @@
+// Package ui provides terminal output utilities including markdown rendering, progress indicators, and TUI components.
 package ui
 
 import (

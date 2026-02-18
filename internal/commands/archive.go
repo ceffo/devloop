@@ -1,3 +1,4 @@
+// Package commands implements the devloop CLI commands.
 package commands
 
 import (
@@ -22,7 +23,7 @@ and their status is updated to 'archived' in active storage.
 
 Example:
   devloop archive`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+RunE: func(cmd *cobra.Command, _ []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
 
