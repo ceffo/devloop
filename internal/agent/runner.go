@@ -78,7 +78,7 @@ func runCLIAgent(binary, header, model, prompt, logPath string, buildArgs func(m
 		}()
 
 		runErr = cmd.Run()
-		pw.Close()
+		_ = pw.Close()
 		wg.Wait()
 	} else {
 		cmd.Stdout = logFile

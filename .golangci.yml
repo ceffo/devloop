@@ -1,0 +1,40 @@
+# golangci-lint configuration
+# See https://golangci-lint.run/docs/configuration/
+
+version: "2"
+
+linters:
+  enable:
+    - govet       # Reports suspicious constructs
+    - errcheck    # Checks for unchecked errors
+    - staticcheck # Static analysis checks (includes gosimple)
+    - ineffassign # Detects ineffectual assignments
+    - unused      # Checks for unused code
+    - gocritic    # Opinionated linter
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment  # Skip struct field alignment optimization suggestions
+        - shadow          # Shadowed 'err' variables are idiomatic in Go
+    gocritic:
+      disabled-checks:
+        - commentFormatting  # Don't enforce comment formatting style
+    errcheck:
+      exclude-functions:
+        - (*os.File).Close   # Standard defer close pattern; errors not actionable
+        - fmt.Fprintf        # Writing to io.Writer (logs/terminal); errors not actionable
+  exclusions:
+    rules:
+      # Test cleanup and setup — errors are not actionable in test teardown/setup
+      - path: "_test\\.go"
+        linters: [errcheck]
+        text: "Error return value of `(os\\.RemoveAll|os\\.Remove|os\\.MkdirAll|os\\.WriteFile|os\\.Setenv|os\\.Unsetenv)` is not checked"
+      # SaveTask calls in tests that focus on other functionality
+      - path: "_test\\.go"
+        linters: [errcheck]
+        text: "Error return value of `storage\\.SaveTask` is not checked"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

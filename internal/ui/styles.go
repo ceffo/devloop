@@ -20,46 +20,46 @@ var (
 	baseStyle = lipgloss.NewStyle()
 
 	// Heading styles
-	h1Style = baseStyle.Copy().Bold(true).Foreground(colorCyan).MarginBottom(1)
-	h2Style = baseStyle.Copy().Bold(true).Foreground(colorBlue)
-	h3Style = baseStyle.Copy().Bold(true)
+	h1Style = baseStyle.Bold(true).Foreground(colorCyan).MarginBottom(1)
+	h2Style = baseStyle.Bold(true).Foreground(colorBlue)
+	h3Style = baseStyle.Bold(true)
 
 	// Message styles
-	successStyle = baseStyle.Copy().Foreground(colorGreen).Bold(true)
-	errorStyle   = baseStyle.Copy().Foreground(colorRed).Bold(true)
-	warningStyle = baseStyle.Copy().Foreground(colorYellow).Bold(true)
-	infoStyle    = baseStyle.Copy().Foreground(colorBlue)
+	successStyle = baseStyle.Foreground(colorGreen).Bold(true)
+	errorStyle   = baseStyle.Foreground(colorRed).Bold(true)
+	warningStyle = baseStyle.Foreground(colorYellow).Bold(true)
+	infoStyle    = baseStyle.Foreground(colorBlue)
 
 	// Label and value styles
-	labelStyle = baseStyle.Copy().Foreground(colorCyan).Bold(true)
-	valueStyle = baseStyle.Copy()
+	labelStyle = baseStyle.Foreground(colorCyan).Bold(true)
+	valueStyle = baseStyle
 
 	// Status styles
-	statusCompletedStyle  = baseStyle.Copy().Foreground(colorGreen)
-	statusInProgressStyle = baseStyle.Copy().Foreground(colorYellow)
-	statusFailedStyle     = baseStyle.Copy().Foreground(colorRed)
-	statusBlockedStyle    = baseStyle.Copy().Foreground(colorMagenta)
-	statusArchivedStyle   = baseStyle.Copy().Foreground(colorGray)
-	statusPendingStyle    = baseStyle.Copy()
+	statusCompletedStyle  = baseStyle.Foreground(colorGreen)
+	statusInProgressStyle = baseStyle.Foreground(colorYellow)
+	statusFailedStyle     = baseStyle.Foreground(colorRed)
+	statusBlockedStyle    = baseStyle.Foreground(colorMagenta)
+	statusArchivedStyle   = baseStyle.Foreground(colorGray)
+	statusPendingStyle    = baseStyle
 
 	// Border styles
-	borderStyle = baseStyle.Copy().
+	borderStyle = baseStyle.
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(colorCyan).
 			Padding(1, 2)
 
-	sectionBorderStyle = baseStyle.Copy().
+	sectionBorderStyle = baseStyle.
 				Border(lipgloss.DoubleBorder()).
 				BorderForeground(colorBlue).
 				Padding(0, 2)
 
 	// Table-related styles
-	tableHeaderStyle = baseStyle.Copy().Bold(true).Foreground(colorCyan)
-	tableCellStyle   = baseStyle.Copy()
+	tableHeaderStyle = baseStyle.Bold(true).Foreground(colorCyan)
+	tableCellStyle   = baseStyle
 
 	// Result styles
-	resultPassedStyle = baseStyle.Copy().Foreground(colorGreen)
-	resultFailedStyle = baseStyle.Copy().Foreground(colorRed)
+	resultPassedStyle = baseStyle.Foreground(colorGreen)
+	resultFailedStyle = baseStyle.Foreground(colorRed)
 )
 
 func init() {
@@ -72,27 +72,27 @@ func init() {
 // disableColors removes all color and styling
 func disableColors() {
 	baseStyle = lipgloss.NewStyle()
-	h1Style = baseStyle.Copy()
-	h2Style = baseStyle.Copy()
-	h3Style = baseStyle.Copy()
-	successStyle = baseStyle.Copy()
-	errorStyle = baseStyle.Copy()
-	warningStyle = baseStyle.Copy()
-	infoStyle = baseStyle.Copy()
-	labelStyle = baseStyle.Copy()
-	valueStyle = baseStyle.Copy()
-	statusCompletedStyle = baseStyle.Copy()
-	statusInProgressStyle = baseStyle.Copy()
-	statusFailedStyle = baseStyle.Copy()
-	statusBlockedStyle = baseStyle.Copy()
-	statusArchivedStyle = baseStyle.Copy()
-	statusPendingStyle = baseStyle.Copy()
-	borderStyle = baseStyle.Copy()
-	sectionBorderStyle = baseStyle.Copy()
-	tableHeaderStyle = baseStyle.Copy()
-	tableCellStyle = baseStyle.Copy()
-	resultPassedStyle = baseStyle.Copy()
-	resultFailedStyle = baseStyle.Copy()
+	h1Style = baseStyle
+	h2Style = baseStyle
+	h3Style = baseStyle
+	successStyle = baseStyle
+	errorStyle = baseStyle
+	warningStyle = baseStyle
+	infoStyle = baseStyle
+	labelStyle = baseStyle
+	valueStyle = baseStyle
+	statusCompletedStyle = baseStyle
+	statusInProgressStyle = baseStyle
+	statusFailedStyle = baseStyle
+	statusBlockedStyle = baseStyle
+	statusArchivedStyle = baseStyle
+	statusPendingStyle = baseStyle
+	borderStyle = baseStyle
+	sectionBorderStyle = baseStyle
+	tableHeaderStyle = baseStyle
+	tableCellStyle = baseStyle
+	resultPassedStyle = baseStyle
+	resultFailedStyle = baseStyle
 }
 
 // Success returns a formatted success message

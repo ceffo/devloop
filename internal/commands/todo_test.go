@@ -36,7 +36,7 @@ func TestProcessCmd(t *testing.T) {
 	// Test that ProcessCmd returns a valid command
 	cmd := ProcessCmd()
 	if cmd == nil {
-		t.Error("ProcessCmd returned nil")
+		t.Fatal("ProcessCmd returned nil")
 	}
 
 	if cmd.Use != "process" {

@@ -2,6 +2,10 @@
 build:
   go build -o bin/devloop cmd/devloop/main.go
 
+# run linter
+lint:
+  golangci-lint run ./...
+
 # run tests
 test:
   go test ./...

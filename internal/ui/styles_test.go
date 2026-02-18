@@ -254,17 +254,16 @@ func TestStatusIconStr(t *testing.T) {
 
 // Helper to re-initialize colors (for testing)
 func initializeColors() {
-	baseStyle = baseStyle.Copy()
-	successStyle = baseStyle.Copy().Foreground(colorGreen).Bold(true)
-	errorStyle = baseStyle.Copy().Foreground(colorRed).Bold(true)
-	warningStyle = baseStyle.Copy().Foreground(colorYellow).Bold(true)
-	infoStyle = baseStyle.Copy().Foreground(colorBlue)
-	labelStyle = baseStyle.Copy().Foreground(colorCyan).Bold(true)
-	valueStyle = baseStyle.Copy()
-	statusCompletedStyle = baseStyle.Copy().Foreground(colorGreen)
-	statusInProgressStyle = baseStyle.Copy().Foreground(colorYellow)
-	statusFailedStyle = baseStyle.Copy().Foreground(colorRed)
-	statusBlockedStyle = baseStyle.Copy().Foreground(colorMagenta)
-	statusArchivedStyle = baseStyle.Copy().Foreground(colorGray)
-	statusPendingStyle = baseStyle.Copy()
+	successStyle = baseStyle.Foreground(colorGreen).Bold(true)
+	errorStyle = baseStyle.Foreground(colorRed).Bold(true)
+	warningStyle = baseStyle.Foreground(colorYellow).Bold(true)
+	infoStyle = baseStyle.Foreground(colorBlue)
+	labelStyle = baseStyle.Foreground(colorCyan).Bold(true)
+	valueStyle = baseStyle
+	statusCompletedStyle = baseStyle.Foreground(colorGreen)
+	statusInProgressStyle = baseStyle.Foreground(colorYellow)
+	statusFailedStyle = baseStyle.Foreground(colorRed)
+	statusBlockedStyle = baseStyle.Foreground(colorMagenta)
+	statusArchivedStyle = baseStyle.Foreground(colorGray)
+	statusPendingStyle = baseStyle
 }

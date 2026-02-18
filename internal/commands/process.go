@@ -207,7 +207,7 @@ func displayTasksSummary(tasks []*storage.Task) {
 			dependencies = fmt.Sprintf("%v", task.BlockedBy)
 		}
 
-		table.Append(
+		_ = table.Append(
 			task.ID,
 			truncateString(task.Title, 40),
 			task.Complexity,
@@ -226,7 +226,7 @@ func confirmSave(count int) bool {
 	fmt.Printf("Save %d task(s) to storage? [y/N]: ", count)
 
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 
 	response = toLower(trim(response))
 	return response == "y" || response == "yes"

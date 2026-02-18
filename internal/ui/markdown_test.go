@@ -114,15 +114,12 @@ func TestRenderMarkdown_NoColor(t *testing.T) {
 }
 
 func TestRenderMarkdown_EmptyString(t *testing.T) {
-	output, err := RenderMarkdown("")
+	_, err := RenderMarkdown("")
 	if err != nil {
 		t.Errorf("RenderMarkdown() unexpected error for empty string: %v", err)
 	}
 
-	// Empty input should produce empty or minimal output
-	if output == "" || strings.TrimSpace(output) == "" {
-		// This is acceptable
-	}
+	// Empty input should produce empty or minimal output (acceptable)
 }
 
 func TestRenderMarkdown_LongContent(t *testing.T) {

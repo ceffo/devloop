@@ -152,7 +152,7 @@ func (s *Storage) UpdateTask(task *Task) error {
 	for _, t := range tasks {
 		if err := encoder.Encode(t); err != nil {
 			tmpFile.Close()
-			os.Remove(tmpPath)
+			_ = os.Remove(tmpPath)
 			return fmt.Errorf("failed to encode task: %w", err)
 		}
 	}
@@ -161,7 +161,7 @@ func (s *Storage) UpdateTask(task *Task) error {
 
 	// Atomically replace the original file
 	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to replace tasks file: %w", err)
 	}
 

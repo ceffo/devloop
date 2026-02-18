@@ -552,7 +552,7 @@ Example:
 
 	// Add flags
 	cmd.Flags().StringVar(&statusFlag, "status", "", "new status (required: pending, in_progress, completed, failed, blocked, archived)")
-	cmd.MarkFlagRequired("status")
+	_ = cmd.MarkFlagRequired("status")
 
 	return cmd
 }
