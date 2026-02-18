@@ -107,7 +107,7 @@ func renderPRDPrompt(project config.ProjectConfig, prdContent string, nextID str
 }
 
 // ProcessPRD reads a PRD file and converts it into structured tasks using an AI agent.
-func ProcessPRD(cfg *config.Config, filePath string) ([]*storage.Task, error) {
+func ProcessPRD(cfg *config.Config, filePath string, agentName string) ([]*storage.Task, error) {
 	prdContent, err := ReadPRDFile(filePath)
 	if err != nil {
 		return nil, err
@@ -124,10 +124,9 @@ func ProcessPRD(cfg *config.Config, filePath string) ([]*storage.Task, error) {
 		return nil, fmt.Errorf("failed to render PRD prompt: %w", err)
 	}
 
-	defaultAgentName := cfg.CLI.GetDefaultAgentName()
-	agentConfig, err := cfg.CLI.GetAgent(defaultAgentName)
+	agentConfig, err := cfg.CLI.GetAgent(agentName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get default agent configuration: %w", err)
+		return nil, fmt.Errorf("failed to get agent configuration: %w", err)
 	}
 
 	agentRunner, err := agent.NewAgentRunner(agentConfig.Tool)

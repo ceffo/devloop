@@ -57,13 +57,6 @@ func (c *Config) Validate() error {
 	// Validate agents configuration
 	if len(c.CLI.Agents) > 0 {
 		// New format: agents map
-		if c.CLI.DefaultAgent != "" {
-			// Check if default agent exists
-			if _, exists := c.CLI.Agents[c.CLI.DefaultAgent]; !exists {
-				return fmt.Errorf("cli.default_agent references non-existent agent: %s", c.CLI.DefaultAgent)
-			}
-		}
-
 		// Validate each agent
 		for agentName, agent := range c.CLI.Agents {
 			// Check tool is valid

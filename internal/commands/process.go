@@ -51,6 +51,7 @@ Examples:
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
+			agentName, _ := cmd.Flags().GetString("agent")
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
@@ -75,7 +76,7 @@ Examples:
 			fmt.Printf("Found %d TODO item(s)\n\n", len(todos))
 			fmt.Println("Processing TODO items with AI agent...")
 
-			tasks, err := processor.ProcessTodoItems(cfg, todos)
+			tasks, err := processor.ProcessTodoItems(cfg, todos, agentName)
 			if err != nil {
 				return fmt.Errorf("failed to process TODO items: %w", err)
 			}
@@ -131,6 +132,7 @@ Examples:
 			filePath := args[0]
 
 			configPath, _ := cmd.Flags().GetString("config")
+			agentName, _ := cmd.Flags().GetString("agent")
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
@@ -142,7 +144,7 @@ Examples:
 			fmt.Printf("Processing PRD file: %s\n", filePath)
 			fmt.Println("Running AI agent to decompose requirements into tasks...")
 
-			tasks, err := processor.ProcessPRD(cfg, filePath)
+			tasks, err := processor.ProcessPRD(cfg, filePath, agentName)
 			if err != nil {
 				return fmt.Errorf("failed to process PRD: %w", err)
 			}

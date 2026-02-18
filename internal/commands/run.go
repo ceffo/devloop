@@ -15,7 +15,6 @@ func RunCmd() *cobra.Command {
 		continueSession bool
 		resumeSession   bool
 		dryRun          bool
-		agentName       string
 	)
 
 	cmd := &cobra.Command{
@@ -29,19 +28,22 @@ automatically committed (if enabled).
 
 Flags:
   --task ID      Run a specific task by ID
-  --agent NAME   Use specific agent from config (default: uses configured default)
   --continue     Resume execution from last checkpoint
   --dry-run      Show what would be executed without running
+
+Global flags:
+  --agent NAME   Use specific agent from config (default: first in list)
 
 Examples:
   devloop run
   devloop run --task DEV-2
-  devloop run --agent claude
+  devloop --agent claude run
   devloop run --continue
   devloop run --dry-run`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config path from persistent flags
 			configPath, _ := cmd.Flags().GetString("config")
+			agentName, _ := cmd.Flags().GetString("agent")
 
 			// Load configuration
 			cfg, err := config.LoadConfig(configPath)
@@ -69,7 +71,6 @@ Examples:
 
 	// Add flags
 	cmd.Flags().StringVar(&taskID, "task", "", "run specific task by ID")
-	cmd.Flags().StringVar(&agentName, "agent", "", "use specific agent from config (default: uses configured default)")
 	cmd.Flags().BoolVar(&continueSession, "continue", false, "resume from last checkpoint")
 	cmd.Flags().BoolVar(&resumeSession, "resume", false, "resume from last checkpoint (alias for --continue)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be executed without running")

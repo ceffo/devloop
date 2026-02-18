@@ -87,13 +87,12 @@ func sessionStatusCmd() *cobra.Command {
 
 // sessionRecoverCmd resumes from the last checkpoint
 func sessionRecoverCmd() *cobra.Command {
-	var agentName string
-
 	cmd := &cobra.Command{
 		Use:   "recover",
 		Short: "Recover execution from last checkpoint",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
+			agentName, _ := cmd.Flags().GetString("agent")
 
 			cfg, err := config.LoadConfig(configPath)
 			if err != nil {
@@ -112,8 +111,6 @@ func sessionRecoverCmd() *cobra.Command {
 			return executor.ExecuteDevLoop(cfg, "", true, false, agentName)
 		},
 	}
-
-	cmd.Flags().StringVar(&agentName, "agent", "", "use specific agent from config (default: uses configured default)")
 
 	return cmd
 }

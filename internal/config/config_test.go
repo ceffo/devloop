@@ -260,6 +260,7 @@ func TestConfigMarshaling(t *testing.T) {
 func TestGetAgent_DefaultAgent(t *testing.T) {
 	cfg := getDefaultConfig()
 
+	// Empty name should return first agent alphabetically
 	agent, err := cfg.CLI.GetAgent("")
 	if err != nil {
 		t.Fatalf("GetAgent() should succeed for default: %v", err)
@@ -303,7 +304,6 @@ func TestGetAgent_InvalidAgent(t *testing.T) {
 func TestGetAgent_MultipleAgents(t *testing.T) {
 	cfg := &Config{
 		CLI: CLIConfig{
-			DefaultAgent: "claude",
 			Agents: map[string]*AgentConfig{
 				"claude": {
 					Tool:   "claude",
@@ -332,7 +332,7 @@ func TestGetAgent_MultipleAgents(t *testing.T) {
 func TestGetDefaultAgentName_Explicit(t *testing.T) {
 	cfg := &Config{
 		CLI: CLIConfig{
-			DefaultAgent: "copilot",
+			// No DefaultAgent field anymore; first alphabetically wins
 			Agents: map[string]*AgentConfig{
 				"claude":  {Tool: "claude"},
 				"copilot": {Tool: "copilot"},
@@ -341,8 +341,8 @@ func TestGetDefaultAgentName_Explicit(t *testing.T) {
 	}
 
 	name := cfg.CLI.GetDefaultAgentName()
-	if name != "copilot" {
-		t.Errorf("Expected 'copilot', got '%s'", name)
+	if name != "claude" {
+		t.Errorf("Expected 'claude' (first alphabetically), got '%s'", name)
 	}
 }
 
@@ -351,9 +351,9 @@ func TestGetDefaultAgentName_Alphabetical(t *testing.T) {
 		CLI: CLIConfig{
 			// DefaultAgent not set, should use alphabetical
 			Agents: map[string]*AgentConfig{
-				"zulu":   {Tool: "claude"},
-				"alpha":  {Tool: "copilot"},
-				"bravo":  {Tool: "claude"},
+				"zulu":  {Tool: "claude"},
+				"alpha": {Tool: "copilot"},
+				"bravo": {Tool: "claude"},
 			},
 		},
 	}
@@ -379,10 +379,6 @@ func TestMigrateOldFormat(t *testing.T) {
 		t.Error("migrateOldFormat should return true for old format")
 	}
 
-	if cli.DefaultAgent != "default" {
-		t.Errorf("Expected default_agent 'default', got '%s'", cli.DefaultAgent)
-	}
-
 	if agent, exists := cli.Agents["default"]; !exists || agent.Tool != "claude" {
 		t.Error("Migration should create 'default' agent with old settings")
 	}
@@ -390,7 +386,6 @@ func TestMigrateOldFormat(t *testing.T) {
 
 func TestMigrateOldFormat_AlreadyNew(t *testing.T) {
 	cli := CLIConfig{
-		DefaultAgent: "claude",
 		Agents: map[string]*AgentConfig{
 			"claude": {Tool: "claude", Models: map[string]string{"simple": "claude-haiku-4-5-20251001"}},
 		},
@@ -448,11 +443,6 @@ func TestLoadOldFormatConfig(t *testing.T) {
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
 		t.Fatalf("LoadConfig failed: %v", err)
-	}
-
-	// Should have migrated to new format
-	if cfg.CLI.DefaultAgent != "default" {
-		t.Errorf("Expected migrated default_agent 'default', got '%s'", cfg.CLI.DefaultAgent)
 	}
 
 	// Should still be able to get agent
@@ -541,7 +531,7 @@ func TestLoadNewFormatConfig(t *testing.T) {
 		t.Error("Both agents should be loaded correctly")
 	}
 
-	// Default should be claude
+	// Default should be claude (first alphabetically)
 	if cfg.CLI.GetDefaultAgentName() != "claude" {
 		t.Errorf("Expected default agent 'claude', got '%s'", cfg.CLI.GetDefaultAgentName())
 	}

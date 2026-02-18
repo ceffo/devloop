@@ -252,7 +252,6 @@ func TestValidate_RealProjectDirectory(t *testing.T) {
 			TimeoutSeconds: 600,
 		},
 		CLI: CLIConfig{
-			DefaultAgent: "claude",
 			Agents: map[string]*AgentConfig{
 				"claude": {
 					Tool: "claude",
@@ -290,7 +289,6 @@ func TestValidate_MultipleAgentsValid(t *testing.T) {
 			TimeoutSeconds: 300,
 		},
 		CLI: CLIConfig{
-			DefaultAgent: "claude",
 			Agents: map[string]*AgentConfig{
 				"claude": {
 					Tool: "claude",
@@ -334,7 +332,6 @@ func TestValidate_InvalidAgentTool(t *testing.T) {
 			TimeoutSeconds: 300,
 		},
 		CLI: CLIConfig{
-			DefaultAgent: "invalid-agent",
 			Agents: map[string]*AgentConfig{
 				"invalid-agent": {
 					Tool: "invalid-tool",
@@ -359,44 +356,6 @@ func TestValidate_InvalidAgentTool(t *testing.T) {
 	}
 }
 
-func TestValidate_DefaultAgentNotExists(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	cfg := &Config{
-		Project: ProjectConfig{
-			Name: "test",
-			Path: tmpDir,
-		},
-		Verification: VerificationConfig{
-			Command:        "go test",
-			TimeoutSeconds: 300,
-		},
-		CLI: CLIConfig{
-			DefaultAgent: "nonexistent",
-			Agents: map[string]*AgentConfig{
-				"claude": {
-					Tool: "claude",
-					Models: map[string]string{
-						"simple": "claude-haiku-4-5-20251001",
-					},
-				},
-			},
-		},
-		Execution: ExecutionConfig{
-			MaxAttempts: 2,
-		},
-	}
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Error("Validate() should fail when default_agent doesn't exist")
-	}
-
-	if !strings.Contains(err.Error(), "default_agent references non-existent agent") {
-		t.Errorf("Expected error about missing default_agent, got: %v", err)
-	}
-}
-
 func TestValidate_AgentEmptyModels(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -410,7 +369,6 @@ func TestValidate_AgentEmptyModels(t *testing.T) {
 			TimeoutSeconds: 300,
 		},
 		CLI: CLIConfig{
-			DefaultAgent: "claude",
 			Agents: map[string]*AgentConfig{
 				"claude": {
 					Tool:   "claude",
@@ -446,7 +404,6 @@ func TestValidate_InvalidModelInAgent(t *testing.T) {
 			TimeoutSeconds: 300,
 		},
 		CLI: CLIConfig{
-			DefaultAgent: "claude",
 			Agents: map[string]*AgentConfig{
 				"claude": {
 					Tool: "claude",

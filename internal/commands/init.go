@@ -185,7 +185,6 @@ func createInitialConfig(name, path, techStack string) *config.Config {
 			TimeoutSeconds: 300,
 		},
 		CLI: config.CLIConfig{
-			DefaultAgent: "claude",
 			Agents: map[string]*config.AgentConfig{
 				"claude": {
 					Tool: "claude",

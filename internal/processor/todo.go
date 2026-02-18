@@ -210,7 +210,7 @@ func renderTodoPrompt(project config.ProjectConfig, todos []TodoItem, nextID str
 }
 
 // ProcessTodoItems converts TODO items into structured tasks using AI agent
-func ProcessTodoItems(cfg *config.Config, todos []TodoItem) ([]*storage.Task, error) {
+func ProcessTodoItems(cfg *config.Config, todos []TodoItem, agentName string) ([]*storage.Task, error) {
 	if len(todos) == 0 {
 		return []*storage.Task{}, nil
 	}
@@ -230,11 +230,10 @@ func ProcessTodoItems(cfg *config.Config, todos []TodoItem) ([]*storage.Task, er
 		return nil, fmt.Errorf("failed to render TODO prompt: %w", err)
 	}
 
-	// Get default agent config
-	defaultAgentName := cfg.CLI.GetDefaultAgentName()
-	agentConfig, err := cfg.CLI.GetAgent(defaultAgentName)
+	// Get agent config
+	agentConfig, err := cfg.CLI.GetAgent(agentName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get default agent configuration: %w", err)
+		return nil, fmt.Errorf("failed to get agent configuration: %w", err)
 	}
 
 	// Create agent runner

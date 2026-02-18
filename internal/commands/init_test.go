@@ -217,10 +217,6 @@ func TestCreateInitialConfig(t *testing.T) {
 		t.Errorf("Execution.MaxAttempts = %d, want %d", cfg.Execution.MaxAttempts, 2)
 	}
 
-	if cfg.CLI.DefaultAgent != "claude" {
-		t.Errorf("CLI.DefaultAgent = %q, want %q", cfg.CLI.DefaultAgent, "claude")
-	}
-
 	if len(cfg.CLI.Agents) != 2 {
 		t.Errorf("CLI.Agents length = %d, want 2", len(cfg.CLI.Agents))
 	}

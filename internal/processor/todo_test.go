@@ -351,7 +351,6 @@ func TestGenerateNextTaskID(t *testing.T) {
 func TestParseTasksFromJSON(t *testing.T) {
 	cfg := &config.Config{
 		CLI: config.CLIConfig{
-			DefaultAgent: "test",
 			Agents: map[string]*config.AgentConfig{
 				"test": {
 					Tool: "claude",
@@ -470,7 +469,6 @@ func TestParseTasksFromJSON(t *testing.T) {
 		})
 	}
 }
-
 
 func TestRenderTodoPrompt(t *testing.T) {
 	project := config.ProjectConfig{

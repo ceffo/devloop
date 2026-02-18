@@ -22,12 +22,12 @@ type Config struct {
 
 // ProjectConfig holds project-specific metadata
 type ProjectConfig struct {
-	Name          string `json:"name"`
-	Path          string `json:"path"`
-	TechStack     string `json:"tech_stack"`
-	MainBranch    string `json:"main_branch"`
-	TaskIDPrefix  string `json:"task_id_prefix,omitempty"`  // e.g., "DEV", "WORK"
-	TaskIDFormat  string `json:"task_id_format,omitempty"`  // "hierarchical" or "jira"
+	Name         string `json:"name"`
+	Path         string `json:"path"`
+	TechStack    string `json:"tech_stack"`
+	MainBranch   string `json:"main_branch"`
+	TaskIDPrefix string `json:"task_id_prefix,omitempty"` // e.g., "DEV", "WORK"
+	TaskIDFormat string `json:"task_id_format,omitempty"` // "hierarchical" or "jira"
 }
 
 // VerificationConfig defines how to verify task completion
@@ -58,10 +58,9 @@ func (a *AgentConfig) GetModel(complexity string) (string, error) {
 }
 
 // CLIConfig specifies which AI CLI tool and models to use
-// Supports multiple agents with optional default agent selection
+// Supports multiple agents; the active agent is selected via --agent flag at runtime
 type CLIConfig struct {
-	DefaultAgent string                  `json:"default_agent,omitempty"`
-	Agents       map[string]*AgentConfig `json:"agents,omitempty"`
+	Agents map[string]*AgentConfig `json:"agents,omitempty"`
 
 	// Deprecated fields for backwards compatibility
 	// These are converted to the agents map on load
@@ -112,15 +111,7 @@ func (c *CLIConfig) GetAgent(name string) (*AgentConfig, error) {
 		return nil, fmt.Errorf("agent %q not found (available: %v)", name, available)
 	}
 
-	// If no name requested, return default agent
-	if c.DefaultAgent != "" {
-		if agent, exists := c.Agents[c.DefaultAgent]; exists {
-			return agent, nil
-		}
-		return nil, fmt.Errorf("default agent %q not found", c.DefaultAgent)
-	}
-
-	// No default agent specified, use first alphabetically
+	// No name requested, use first alphabetically
 	if len(c.Agents) > 0 {
 		available := make([]string, 0, len(c.Agents))
 		for agentName := range c.Agents {
@@ -133,15 +124,9 @@ func (c *CLIConfig) GetAgent(name string) (*AgentConfig, error) {
 	return nil, fmt.Errorf("no agents configured")
 }
 
-// GetDefaultAgentName returns the effective default agent name
-// If default_agent is set, returns it. Otherwise returns first agent alphabetically.
+// GetDefaultAgentName returns the first agent name alphabetically.
+// Use the --agent flag at the command line to select a different agent.
 func (c *CLIConfig) GetDefaultAgentName() string {
-	// If default is explicitly set, use it
-	if c.DefaultAgent != "" {
-		return c.DefaultAgent
-	}
-
-	// Return first alphabetically
 	if len(c.Agents) > 0 {
 		available := make([]string, 0, len(c.Agents))
 		for agentName := range c.Agents {
@@ -150,7 +135,6 @@ func (c *CLIConfig) GetDefaultAgentName() string {
 		sort.Strings(available)
 		return available[0]
 	}
-
 	return ""
 }
 
@@ -174,7 +158,6 @@ func (c *CLIConfig) migrateOldFormat() bool {
 			Models: c.Models,
 		},
 	}
-	c.DefaultAgent = "default"
 
 	// Keep old fields for backwards compatibility on save
 	// They'll be preserved as-is in JSON
@@ -251,7 +234,6 @@ func getDefaultConfig() *Config {
 			TimeoutSeconds: 300,
 		},
 		CLI: CLIConfig{
-			DefaultAgent: "claude",
 			Agents: map[string]*AgentConfig{
 				"claude": {
 					Tool: "claude",
@@ -314,9 +296,6 @@ func applyDefaults(cfg *Config) {
 	// Apply CLI defaults
 	if len(cfg.CLI.Agents) == 0 {
 		cfg.CLI.Agents = defaults.CLI.Agents
-	}
-	if cfg.CLI.DefaultAgent == "" {
-		cfg.CLI.DefaultAgent = defaults.CLI.DefaultAgent
 	}
 
 	// Also set legacy fields for backwards compatibility
