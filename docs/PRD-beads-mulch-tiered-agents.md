@@ -76,8 +76,17 @@ type TaskStore interface {
     UpdateTask(task *Task) error
     GetTask(id string) (*Task, error)
     QueryTasks(filter Filter) ([]*Task, error)
+    QueryReadyTasks() ([]*Task, error) // tasks with no open blockers
 }
 ```
+
+`QueryReadyTasks` replaces the executor's current two-step pattern of `QueryTasks` + `filterReadyTasks`.
+`JSONLStore` implements it with the existing `filterReadyTasks` logic; `BeadsStore` delegates to
+`bd ready --json`.
+
+> **Note:** `Storage.ConfigPath()` exists in the current codebase but is not included in `TaskStore`.
+> Callers should derive this from `config.Config.Project.Path` instead. Verify no callers depend on
+> it via the storage type before removing.
 
 #### 1.2 JSONLStore Rename
 
@@ -133,7 +142,35 @@ package's use of `claude` and `copilot` CLI tools). It must not import Beads as 
 
 Constructor: `NewBeadsStore(cfg *config.Config) (*BeadsStore, error)`
 
-#### 2.2 Task Sidecar Files
+The constructor **must fail-fast** if the `bd` binary is not on `$PATH`. Return a descriptive error
+including all install options:
+- `go install github.com/steveyegge/beads/cmd/bd@latest`
+- `npm install -g @beads/bd`
+- `brew install beads`
+
+#### 2.2 Task ID Mapping
+
+devloop uses hierarchical IDs ("1.1", "2.3") or prefix-style IDs ("DEV-1"). Beads uses hash-based
+IDs (`bd-a1b2`, `bd-f14c`) to prevent merge collisions. These must be reconciled.
+
+**Strategy:** Let Beads assign hash IDs and maintain a bidirectional mapping using Beads' built-in
+KV store (`bd kv`), which syncs automatically via Dolt:
+
+```
+bd kv set "devloop:DEV-5" "bd-x7f3"    # devloop ID → Beads ID
+bd kv set "beads:bd-x7f3" "DEV-5"      # reverse lookup
+```
+
+`BeadsStore.GetTask("DEV-5")` resolves the Beads ID via `bd kv get "devloop:DEV-5"`, then calls
+`bd show <beads-id> --json`. If the input is already a Beads hash ID, it's used directly.
+
+`BeadsStore.SaveTask(task)` creates the task via `bd create`, captures the returned hash ID, and
+writes both KV entries. The sidecar filename uses the Beads hash ID.
+
+> **Why not `--id`?** Beads supports `bd create --id <custom-id>`, but devloop IDs like "1.1"
+> contain dots that conflict with Beads' hierarchical notation (`bd-parent.1`). Hash IDs are safer.
+
+#### 2.3 Task Sidecar Files
 
 Beads tracks task lifecycle (status, dependencies, metadata). devloop tracks execution details
 (attempt history, log paths, durations, commit hashes) that are internal and not meaningful to
@@ -141,87 +178,142 @@ Beads. Store this as a sidecar JSON file per task:
 
 Path: `.devloop/tasks/<beads-id>.json`
 
-Sidecar structure mirrors the execution-related fields of `storage.Task`:
+Sidecar structure stores only devloop-internal execution data:
+- `devloop_id` (original devloop ID, e.g. "DEV-5")
 - `complexity` (simple/moderate/complex — maps to AI model)
 - `acceptance_criteria`
-- `blocked_by` (IDs — devloop maintains this, Beads also has deps but they're maintained in parallel)
 - `tags`
 - `max_attempts`
 - `execution` (attempts, total_duration)
 - `results` (verification_output, commit_hash, completed_at)
 
+**Dependencies (`blocked_by`) are NOT stored in the sidecar.** Beads is the single source of truth
+for dependency tracking via `bd dep add/remove/tree`. `BeadsStore.GetTask()` populates
+`task.BlockedBy` from `bd show <id> --json` output. This eliminates the dual-source-of-truth
+problem that would arise from maintaining deps in both systems.
+
 The `BeadsStore.GetTask(id)` method must merge the Beads task data with the sidecar to return
 a complete `*storage.Task`.
 
-#### 2.3 Beads CLI Operations
+#### 2.4 Status Mapping
+
+devloop and Beads use different status vocabularies. `BeadsStore` must translate between them:
+
+| devloop status | Beads status | Notes |
+|---|---|---|
+| `pending` | `open` | Default state after creation |
+| `in_progress` | `in_progress` | Set via `bd update --claim` |
+| `completed` | `closed` | Via `bd close --reason "Verification passed"` |
+| `failed` | `closed` + label | Via `bd close --reason "..."` then `bd label add <id> failed` |
+| `blocked` | `blocked` | Via `bd dep add` (status computed from open blockers) |
+| `archived` | `closed` + compacted | Via `bd admin compact` |
+
+> **Important:** The canonical way to close a Beads issue is `bd close <id> --reason "..."`,
+> NOT `bd update <id> --status closed`. `bd close` supports multiple IDs and records an audit trail.
+
+#### 2.5 Beads CLI Operations
 
 Map `TaskStore` operations to `bd` CLI calls:
 
 | TaskStore method | `bd` CLI command |
 |---|---|
-| `SaveTask` | `bd create "<title>" --description "<body>" --json` |
-| `GetTask` | `bd show <id> --json` |
+| `SaveTask` | `bd create "<title>" --body-file=desc.md --json` + KV mapping |
+| `GetTask` | `bd kv get "devloop:<id>"` → `bd show <beads-id> --json` |
 | `LoadTasks` | `bd list --json --status open` |
-| `QueryTasks` (pending+ready) | `bd ready --json` |
-| `QueryTasks` (by status) | `bd list --json --status <status>` |
+| `QueryTasks` (by status) | `bd list --json --status <mapped-status>` |
+| `QueryReadyTasks` | `bd ready --json` |
 | `UpdateTask` (in_progress) | `bd update <id> --claim --json` |
-| `UpdateTask` (completed) | `bd update <id> --status closed --json` |
-| `UpdateTask` (failed) | `bd update <id> --status closed --label failed --json` |
+| `UpdateTask` (completed) | `bd close <id> --reason "Verification passed"` |
+| `UpdateTask` (failed) | `bd close <id> --reason "<error>"` + `bd label add <id> failed` |
+
+Use `--body-file=<path>` for task descriptions instead of inline `--description` to avoid shell
+escaping issues with multi-line content. Write a temp file, pass it, then clean up.
 
 The `bd` binary must be located via `exec.LookPath`. If `bd` is not found and the config
-requests the Beads backend, return a descriptive error on first use.
+requests the Beads backend, `NewBeadsStore` returns a descriptive error (see §2.1).
 
-#### 2.4 Task Body Format
+#### 2.6 Task Creation Flow
 
-When creating a Beads task, encode devloop-specific metadata in the task description as a YAML
-block appended after a `---` separator:
+When creating a Beads task via `BeadsStore.SaveTask(task)`:
 
-```
-<human-readable description>
+1. Write the human-readable description to a temp file
+2. Call `bd create "<title>" --body-file=<tmpfile> --json` — capture the returned Beads hash ID
+3. Write KV mapping: `bd kv set "devloop:<devloop-id>" "<beads-id>"` and reverse
+4. Write sidecar file at `.devloop/tasks/<beads-id>.json` with complexity, acceptance criteria, tags, etc.
+5. If `task.BlockedBy` is non-empty, call `bd dep add <beads-id> <blocker-beads-id>` for each
+6. Clean up temp file
 
----
-complexity: moderate
-acceptance_criteria:
-  - Criterion one
-  - Criterion two
-verification: go test ./...
-tags:
-  - storage
-  - cli
-```
+All devloop-specific metadata (complexity, acceptance criteria, tags, max attempts) lives in the
+sidecar file, NOT in the Beads description. The Beads description is the human-readable task
+description only — no embedded YAML or structured data.
 
-When reading a task back, parse the YAML block from the description to populate sidecar fields.
+#### 2.7 Dependency Linking
 
-#### 2.5 Dependency Linking
+Beads is the **single source of truth** for task dependencies. devloop does not maintain a parallel
+`blocked_by` list.
 
 When `SaveTask` is called with non-empty `BlockedBy`:
-1. Create the task with `bd create`
-2. For each blocker ID, call `bd dep add <new-id> <blocker-id>`
+1. Create the task with `bd create` (step 2 of §2.6)
+2. Resolve each blocker's devloop ID to its Beads ID via `bd kv get "devloop:<blocker-id>"`
+3. For each resolved blocker, call `bd dep add <new-beads-id> <blocker-beads-id>`
+4. If a `bd dep add` call fails, log a warning and continue (the task exists but the dependency
+   link is missing — recoverable via `bd dep add` manually)
 
-When `QueryTasks` is called with `filter.Status == "pending"`, use `bd ready --json` to get
-only tasks with no open blockers, matching devloop's existing semantics.
+When `QueryReadyTasks` is called, use `bd ready --json` to get only tasks with no open blockers,
+matching devloop's existing `filterReadyTasks` semantics.
 
-#### 2.6 Beads Initialization
+#### 2.8 Beads Initialization
 
 Update `devloop init` (in `internal/commands/init.go`) to detect `storage.backend = "beads"` and:
-1. Check if `bd` is installed; print installation instructions if not
+1. Check if `bd` is installed; print installation instructions if not:
+   - `go install github.com/steveyegge/beads/cmd/bd@latest`
+   - `npm install -g @beads/bd`
+   - `brew install beads`
 2. Run `bd init` in the project directory
 3. Inform the user that stealth mode is available via `bd init --stealth` for personal use
 
-#### 2.7 Archive with Beads Backend
+#### 2.9 Archive with Beads Backend
 
 When `devloop archive` is run against a Beads backend:
 1. Generate the existing `.devloop/archive/archive-TIMESTAMP.jsonl` and `.md` files (unchanged behavior)
-2. Additionally run `bd compact --auto` to apply Beads memory decay (summarize old closed tasks)
+2. Run `bd admin compact --auto --all --tier 1` to apply Beads memory decay (summarize old closed tasks)
+3. Run `bd sync` to persist changes to git (see §2.10)
 
-#### 2.8 Migration Command
+> **Note:** The compact command is under `bd admin`, not top-level `bd compact`.
 
-Add `devloop migrate` subcommand with `--to beads` flag:
+#### 2.10 Beads Sync Lifecycle
+
+Beads uses a Dolt-powered database as source of truth, with JSONL exported for git portability.
+**`bd sync` must be called to persist changes to git** — it exports to JSONL, commits to Dolt,
+pulls remote changes, and pushes. Without `bd sync`, task changes won't survive a `git clone` or
+sync with other agents.
+
+`BeadsStore` must call `bd sync` at these points:
+- After `ExecuteDevLoop` completes (before printing the summary)
+- After `devloop archive` (after compaction)
+- After `devloop migrate --to beads` completes
+
+Consider adding a `Sync() error` method to `BeadsStore` (not on `TaskStore` — it's backend-specific).
+The executor calls it via a type assertion when appropriate.
+
+#### 2.11 Migration Command
+
+Add `devloop migrate` subcommand with `--to beads` and `--to jsonl` flags:
+
+**`devloop migrate --to beads`:**
 1. Read all tasks from existing `tasks.jsonl`
-2. For each task, call `BeadsStore.SaveTask(task)` to create it in Beads (with correct status)
+2. For each task, call `BeadsStore.SaveTask(task)` to create it in Beads (with correct status mapping)
 3. Re-create all `blocked_by` dependency links via `bd dep add`
-4. Print a summary of migrated tasks
-5. On success, rename `tasks.jsonl` to `tasks.jsonl.migrated` as a backup
+4. Run `bd sync` to persist to git
+5. Print a summary of migrated tasks
+6. On success, rename `tasks.jsonl` to `tasks.jsonl.migrated` as a backup
+
+**`devloop migrate --to jsonl`:**
+1. Read all tasks from Beads via `BeadsStore.LoadTasks()`
+2. Write each task to a new `tasks.jsonl` (with reverse status mapping)
+3. Print a summary of migrated tasks
+
+Bidirectional migration provides a safety net for users evaluating the Beads backend.
 
 ---
 
@@ -240,7 +332,7 @@ Create `internal/knowledge/` package with:
 
 ```go
 type Client interface {
-    Prime(domains []string) (string, error)     // returns context string
+    Prime(domains []string, budget int, context string) (string, error) // returns context string
     Record(domain, recordType, content string) error
     IsEnabled() bool
 }
@@ -249,9 +341,10 @@ func NewClient(cfg *config.Config) Client
 ```
 
 **`internal/knowledge/mulch.go`** — `MulchClient` implementation:
-- `Prime(domains)` — runs `mulch prime [domains...] --format markdown`, captures and returns stdout
+- `Prime(domains, budget, context)` — runs `mulch prime [domains...] --format markdown --budget <budget> --context "<context>"`, captures and returns stdout. The `budget` parameter limits output tokens to avoid consuming excessive prompt space. The `context` parameter (typically the task title) improves relevance.
 - `Record(domain, recordType, content)` — runs `mulch record <domain> --type <type> "<content>"`
 - If `mulch` binary is not found, `Prime` returns empty string (non-fatal); `Record` returns an error
+- All CLI calls have a **15-second timeout** to prevent hangs
 
 **`internal/knowledge/noop.go`** — `NoopClient`:
 - `Prime` returns `""`, `Record` returns `nil`, `IsEnabled` returns `false`
@@ -267,6 +360,7 @@ Add `KnowledgeConfig` to `internal/config/config.go`:
 type KnowledgeConfig struct {
     Backend           string   `json:"backend,omitempty"`            // "none" (default) | "mulch"
     Domains           []string `json:"domains,omitempty"`            // e.g. ["build","testing","architecture"]
+    PrimeBudget       int      `json:"prime_budget,omitempty"`       // max tokens for mulch prime output (default: 2000)
     InjectOnExecute   bool     `json:"inject_on_execute,omitempty"`  // default: true when backend != "none"
     RecordOnComplete  bool     `json:"record_on_complete,omitempty"` // default: true when backend != "none"
 }
@@ -295,8 +389,9 @@ and follow established patterns:
 {{end}}
 ```
 
-Update `prompts.RenderTaskPrompt` to accept a `knowledge.Client` parameter. Call `client.Prime(domains)`
-before rendering if `cfg.Knowledge.InjectOnExecute` is true.
+Update `prompts.RenderTaskPrompt` to accept a `knowledge.Client` parameter. Call
+`client.Prime(domains, cfg.Knowledge.PrimeBudget, task.Title)` before rendering if
+`cfg.Knowledge.InjectOnExecute` is true. The task title is passed as context to improve relevance.
 
 Update `executor.executeTask` to pass the knowledge client to `prompts.RenderTaskPrompt`.
 
@@ -310,17 +405,22 @@ Add a second new section to `TaskExecutionPrompt` (rendered only when domains ar
 After completing this task, record any significant learnings using the mulch CLI.
 Only record genuinely reusable knowledge — skip if nothing notable.
 
-Available domains: {{join .KnowledgeDomains ", "}}
+Available domains: {{joinDomains .KnowledgeDomains}}
 
 Examples:
   mulch record build --type convention "Always run go generate before go build"
-  mulch record testing --type failure --description "Race condition in TestFoo" --resolution "Add WaitGroup before channel send"
-  mulch record architecture --type decision --title "Use interface for storage" --rationale "Enables Beads/JSONL swap without caller changes"
+  mulch record testing --type failure "Race condition in TestFoo: add WaitGroup before channel send"
+  mulch record architecture --type decision "Use interface for storage: enables Beads/JSONL swap without caller changes"
 {{end}}
 ```
 
+> **Note:** `joinDomains` requires registering a custom `template.FuncMap` with `strings.Join`.
+> Go's `text/template` has no built-in join function.
+
 This is agent-driven recording. The agent decides what is worth recording. devloop does not
 auto-extract or auto-record.
+
+Available Mulch record types: `convention`, `pattern`, `failure`, `decision`, `reference`, `guide`.
 
 #### 3.5 Mulch Initialization
 
@@ -328,7 +428,17 @@ Update `devloop init` to detect `knowledge.backend = "mulch"` and:
 1. Check if `mulch` (npm package `mulch-cli`) is installed
 2. Run `mulch init` in the project directory
 3. For each configured domain in `knowledge.domains`: run `mulch add <domain>`
-4. Run `mulch setup claude` if the configured agent tool is `claude`, `mulch setup copilot` otherwise
+4. Run `mulch setup <provider>` where `<provider>` is mapped from devloop's agent tool config:
+
+| devloop `agent.tool` | Mulch provider |
+|---|---|
+| `claude` | `claude` |
+| `copilot` | `codex` |
+| (other) | skip `mulch setup` |
+
+> **Note:** Mulch supports: `claude`, `cursor`, `codex`, `gemini`, `windsurf`, `aider`.
+> If devloop's agent tool doesn't map to a known Mulch provider, skip `mulch setup` and
+> log a note that the user can run it manually.
 
 #### 3.6 `devloop knowledge` Subcommand
 
@@ -338,7 +448,9 @@ Add a new top-level CLI command `devloop knowledge` with subcommands:
 |---|---|---|
 | `devloop knowledge status` | Show expertise freshness and record counts | `mulch status` |
 | `devloop knowledge query [domain]` | Query records for a domain (or all) | `mulch query [domain]` |
+| `devloop knowledge search <query>` | Search across all domains | `mulch search <query>` |
 | `devloop knowledge compact` | Compact stale records | `mulch compact --auto` |
+| `devloop knowledge doctor` | Health check: validate domains, find issues | `mulch doctor` |
 | `devloop knowledge diff [ref]` | Show expertise changes since a git ref | `mulch diff [ref]` |
 | `devloop knowledge prime [domains...]` | Print the context that would be injected | `mulch prime [domains...]` |
 
@@ -402,14 +514,14 @@ You have access to the following commands to create and link subtasks:
 ## Instructions
 1. Analyze this task carefully.
 2. If the task is focused enough to be implemented in one coding session (even if it's complex):
-   Output exactly: PROCEED
+   Output exactly on its own line: ##DEVLOOP:PROCEED##
 3. If the task genuinely needs to be split (multiple distinct components or concerns):
    - Create 2 to {{.MaxSubtasks}} focused subtasks using the task store commands
    - Each subtask must be independently implementable and verifiable
    - Use dependencies to order subtasks when necessary
-   - After creating subtasks, output: DECOMPOSED
+   - After creating subtasks, output on its own line: ##DEVLOOP:DECOMPOSED##
 
-Output ONLY the commands (one per line) followed by PROCEED or DECOMPOSED.
+Output ONLY the commands (one per line) followed by the sentinel.
 Do not explain your reasoning. Do not include any other text.
 ```
 
@@ -424,15 +536,18 @@ Write subtask definitions as a JSON array to the file .devloop/coordinator-outpu
 Each object must have: title, description, complexity, acceptance_criteria, blocked_by, tags.
 ```
 
-**Beads backend**: The coordinator uses the `bd` CLI directly:
+**Beads backend**: The coordinator uses the `bd` CLI directly with hierarchical epics:
 ```
-bd create "<title>" --description "<details>" : create a subtask
-bd dep add <subtask-id> <parent-id> : link subtask to parent ({{.TaskID}})
-bd update {{.TaskID}} --status in_progress : mark the parent task as claimed
+bd update {{.TaskID}} --claim                              : claim the parent task
+bd create "<title>" --parent {{.TaskID}} --body-file=desc.md --json  : create subtask (auto-assigns {{.TaskID}}.1, .2, etc.)
 ```
 
-This design means with the Beads backend, the coordinator agent's actions are directly visible
-in the Beads issue tracker — no intermediary state needed.
+Beads' `--parent` flag creates proper parent-child hierarchy (up to 3 levels). Subtask IDs are
+auto-generated as `<parent>.1`, `<parent>.2`, etc. Dependencies between subtasks within the same
+parent can be added via `bd dep add <subtask-id> <other-subtask-id>`.
+
+This is cleaner than manual `bd dep add` for the parent-child relationship and produces a proper
+tree visible via `bd dep tree`.
 
 #### 4.5 Coordinator Execution Flow
 
@@ -444,16 +559,22 @@ func runCoordinator(ctx, cfg, store, task, agentRunner, model, notifier) (decomp
 
 1. Build coordinator prompt via `prompts.RenderCoordinatorPrompt`
 2. Run agent (same `agentRunner` as dev tasks, coordinator model from config)
-3. Parse output:
-   - If output contains `PROCEED`: return `decomposed=false`
-   - If JSONL backend and `DECOMPOSED`: read `.devloop/coordinator-output.json`, create subtasks, return `decomposed=true`
-   - If Beads backend and `DECOMPOSED`: re-query `bd ready` — new subtasks are already in the store
+3. Parse output — use distinctive sentinels to avoid false matches in noisy agent output:
+   - If last non-empty line is `##DEVLOOP:PROCEED##`: return `decomposed=false`
+   - If JSONL backend and `##DEVLOOP:DECOMPOSED##`: read `.devloop/coordinator-output.json`, create subtasks, return `decomposed=true`
+   - If Beads backend and `##DEVLOOP:DECOMPOSED##`: re-query `bd ready` — new subtasks are already in the store
 4. If `decomposed=true`, add newly created subtasks to the execution queue
 
 In `ExecuteDevLoop`, before executing a `complex` task, check `cfg.Execution.Coordinator.Enabled`:
 - If true: call `runCoordinator` first
 - If coordinator says `PROCEED`: execute normally
 - If `DECOMPOSED`: skip the original task (it's now tracked by subtasks), continue to next
+
+**Session Recovery:** If devloop crashes after decomposition but before all subtasks complete:
+- The parent task is `in_progress` with subtasks created in the store
+- On resume: if the parent task is `in_progress` and has child tasks (Beads: check via `bd show --json`;
+  JSONL: check for `decomposed_into` field in sidecar), skip the coordinator and execute remaining subtasks
+- With Beads backend: `bd ready --json` naturally returns only the unfinished subtasks
 
 #### 4.6 `--coordinate` Flag
 
@@ -515,9 +636,12 @@ Add a section "Knowledge Layer" explaining:
 - **Go version**: maintain compatibility with the current `go.mod` Go version
 - **No new library dependencies** for Beads or Mulch — both are CLI tools, not Go libraries
 - **Backward compatibility**: `storage.backend = "jsonl"` must remain the default; no config file migration required for existing projects
+- **Config schema version**: Adding `StorageConfig` and `KnowledgeConfig` is additive — omitted fields default safely. Document this in the config section; a version bump to "1.1" is optional but recommended for clarity
 - **Test coverage**: all new packages (`internal/storage/beads.go`, `internal/knowledge/`) must have unit tests with mocked CLI execution (similar to the existing `agent` package test patterns)
-- **Error messages**: when `bd` or `mulch` binary is not found, error messages must include the exact install command
+- **Error messages**: when `bd` or `mulch` binary is not found, error messages must include the exact install commands (Beads: `go install`, `npm install -g @beads/bd`, or `brew install beads`; Mulch: `npm install -g mulch-cli`)
+- **CLI timeouts**: all `bd` CLI calls must have a 10-second timeout; `mulch prime` must have a 15-second timeout. Use `context.WithTimeout` on the `exec.CommandContext`
 - **Atomic operations**: `BeadsStore.UpdateTask` must use `bd update <id> --claim` for `in_progress` transitions to prevent race conditions in future multi-agent scenarios
+- **Template functions**: Register a custom `template.FuncMap` for `joinDomains` (wrapping `strings.Join`) before parsing any templates that use it
 
 ## Success Criteria
 
