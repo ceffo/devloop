@@ -1,0 +1,15 @@
+{"task_id":"DEV-10","title":"Implement session persistence and resume support","status":"completed","completed_at":"2026-02-17T15:03:27.045812029-05:00"}
+{"task_id":"DEV-11","title":"Build TUI framework with task list view using Bubble Tea","status":"completed","completed_at":"2026-02-17T15:10:20.682505615-05:00"}
+{"task_id":"DEV-12","title":"Display active agent and model info in TUI header","status":"completed","completed_at":"2026-02-17T15:11:48.913702489-05:00"}
+{"task_id":"DEV-13","title":"Add toggleable agent output pane in TUI","status":"completed","completed_at":"2026-02-17T15:16:08.625196988-05:00"}
+{"task_id":"DEV-14","title":"Add usage and limits footer to TUI","status":"completed","completed_at":"2026-02-17T15:25:15.758682496-05:00"}
+{"task_id":"DEV-15","title":"Add interrupt with confirmation prompt in TUI","status":"completed","completed_at":"2026-02-17T15:20:55.54634756-05:00"}
+{"task_id":"DEV-16","title":"Simplify CLI usage output text","status":"completed","completed_at":"2026-02-17T15:49:03.237237213-05:00"}
+{"task_id":"DEV-17","title":"Style CLI usage output with charmbracelet/fang","status":"completed","completed_at":"2026-02-17T15:53:38.173058703-05:00"}
+{"task_id":"DEV-18","title":"Style task list output with charmbracelet widgets","status":"completed","completed_at":"2026-02-17T15:51:53.118741006-05:00"}
+{"task_id":"DEV-19","title":"Streamline agent instruction files to forward to shared guide","status":"completed","completed_at":"2026-02-18T14:36:40.025816744-05:00"}
+{"task_id":"DEV-20","title":"Add --dry-run flag support to all commands","status":"completed","completed_at":"2026-02-18T14:19:53.700699434-05:00"}
+{"task_id":"DEV-21","title":"Add context-based cancellation and graceful shutdown","status":"completed","completed_at":"2026-02-18T14:21:46.449791529-05:00"}
+{"task_id":"DEV-22","title":"Add golangci-lint configuration and fix lint issues","status":"completed","completed_at":"2026-02-18T14:31:28.174297658-05:00"}
+{"task_id":"DEV-23","title":"Set up GitHub Actions CI workflow for build, lint, and test","status":"completed","completed_at":"2026-02-18T14:37:29.033793808-05:00"}
+{"task_id":"DEV-24","title":"Clean out legacy config items and task migration code","status":"completed","completed_at":"2026-02-18T14:35:59.099352298-05:00"}
