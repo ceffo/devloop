@@ -117,6 +117,13 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	// Initialize mulch knowledge backend if configured
+	if cfg.Knowledge.Backend == "mulch" {
+		if err := initMulchBackend(cwd, cfg); err != nil {
+			fmt.Printf("Warning: %v\n", err)
+		}
+	}
+
 	// Success message
 	fmt.Println(ui.Success("devloop initialized successfully!"))
 	fmt.Printf("  Project: %s\n", projectName)
@@ -243,6 +250,77 @@ func createInitialConfig(name, path, techStack string) *config.Config {
 	}
 
 	return cfg
+}
+
+// mulchProvider maps a devloop agent tool name to a Mulch provider name.
+// Returns ("", false) if the tool has no known Mulch provider mapping.
+func mulchProvider(tool string) (string, bool) {
+	providers := map[string]string{
+		"claude":  "claude",
+		"copilot": "codex",
+	}
+	p, ok := providers[tool]
+	return p, ok
+}
+
+// initMulchBackend checks for the mulch binary, runs mulch init, mulch add for each
+// configured domain, and mulch setup for the mapped agent tool provider.
+// If mulch is not found, it prints installation instructions.
+func initMulchBackend(cwd string, cfg *config.Config) error {
+	if _, err := exec.LookPath("mulch"); err != nil {
+		fmt.Println("\nMulch knowledge backend selected, but 'mulch' is not installed.")
+		fmt.Println("Install mulch using:")
+		fmt.Println("  npm install -g mulch-cli")
+		fmt.Println("\nAfter installing, run 'mulch init' in your project directory.")
+		return fmt.Errorf("mulch not found in PATH")
+	}
+
+	fmt.Println("\nInitializing Mulch knowledge backend...")
+	cmd := exec.Command("mulch", "init")
+	cmd.Dir = cwd
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("mulch init failed: %w", err)
+	}
+
+	for _, domain := range cfg.Knowledge.Domains {
+		cmd := exec.Command("mulch", "add", domain)
+		cmd.Dir = cwd
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("mulch add %s failed: %w", domain, err)
+		}
+	}
+
+	// Map each configured agent tool to a Mulch provider and run mulch setup.
+	seen := map[string]bool{}
+	anyUnmapped := false
+	for _, agentCfg := range cfg.CLI.Agents {
+		provider, ok := mulchProvider(agentCfg.Tool)
+		if !ok {
+			anyUnmapped = true
+			continue
+		}
+		if seen[provider] {
+			continue
+		}
+		seen[provider] = true
+		cmd := exec.Command("mulch", "setup", provider)
+		cmd.Dir = cwd
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("mulch setup %s failed: %w", provider, err)
+		}
+	}
+	if anyUnmapped {
+		fmt.Println("Note: one or more agent tools have no Mulch provider mapping; skipping mulch setup for them.")
+		fmt.Println("      You can run 'mulch setup <provider>' manually.")
+	}
+
+	return nil
 }
 
 // initBeadsBackend checks for the bd binary and runs bd init in the project directory.

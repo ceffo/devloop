@@ -249,6 +249,45 @@ func TestInitBeadsBackend_BdNotFound(t *testing.T) {
 	}
 }
 
+func TestInitMulchBackend_MulchNotFound(t *testing.T) {
+	// Override PATH so mulch is not found
+	t.Setenv("PATH", "")
+
+	tempDir, err := os.MkdirTemp("", "devloop-mulch-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	err = initMulchBackend(tempDir, nil)
+	if err == nil {
+		t.Fatal("expected error when mulch is not in PATH, got nil")
+	}
+	if err.Error() != "mulch not found in PATH" {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestMulchProvider(t *testing.T) {
+	tests := []struct {
+		tool     string
+		provider string
+		ok       bool
+	}{
+		{"claude", "claude", true},
+		{"copilot", "codex", true},
+		{"cursor", "", false},
+		{"unknown", "", false},
+		{"", "", false},
+	}
+	for _, tt := range tests {
+		p, ok := mulchProvider(tt.tool)
+		if ok != tt.ok || p != tt.provider {
+			t.Errorf("mulchProvider(%q) = (%q, %v), want (%q, %v)", tt.tool, p, ok, tt.provider, tt.ok)
+		}
+	}
+}
+
 // Helper function for string contains check
 func contains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
