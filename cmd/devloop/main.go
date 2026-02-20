@@ -53,6 +53,9 @@ var sessionCmd = commands.SessionCmd()
 // resumeCmd represents the resume command
 var resumeCmd = commands.ResumeCmd()
 
+// knowledgeCmd represents the knowledge command
+var knowledgeCmd = commands.KnowledgeCmd()
+
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", ".devloop/config.json", "path to configuration file")
@@ -69,6 +72,7 @@ func init() {
 	rootCmd.AddCommand(tasksCmd)
 	rootCmd.AddCommand(archiveCmd)
 	rootCmd.AddCommand(sessionCmd)
+	rootCmd.AddCommand(knowledgeCmd)
 }
 
 func main() {
