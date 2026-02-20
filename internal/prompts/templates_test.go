@@ -310,6 +310,221 @@ func TestRenderTaskPrompt(t *testing.T) {
 	}
 }
 
+func TestRenderCoordinatorPrompt(t *testing.T) {
+	tests := []struct {
+		name           string
+		cfg            *config.Config
+		task           *storage.Task
+		expectContains []string
+		expectError    bool
+	}{
+		{
+			name: "jsonl backend",
+			cfg: &config.Config{
+				Project: config.ProjectConfig{
+					Name:      "myproject",
+					Path:      "/my/project",
+					TechStack: "Go 1.21+",
+				},
+				Storage: config.StorageConfig{
+					Backend: "jsonl",
+				},
+				Execution: config.ExecutionConfig{
+					Coordinator: config.CoordinatorConfig{
+						MaxSubtasks: 4,
+					},
+				},
+			},
+			task: &storage.Task{
+				ID:          "DEV-10",
+				Title:       "Implement storage abstraction",
+				Description: "Refactor storage layer to support multiple backends",
+				AcceptanceCriteria: []string{
+					"TaskStore interface defined",
+					"JSONLStore implements interface",
+					"All tests pass",
+				},
+			},
+			expectContains: []string{
+				"myproject",
+				"Go 1.21+",
+				"/my/project",
+				"DEV-10",
+				"Implement storage abstraction",
+				"Refactor storage layer",
+				"TaskStore interface defined",
+				"JSONLStore implements interface",
+				"All tests pass",
+				"4",
+				"coordinator-output.json",
+				SentinelProceed,
+				SentinelDecomposed,
+			},
+			expectError: false,
+		},
+		{
+			name: "beads backend",
+			cfg: &config.Config{
+				Project: config.ProjectConfig{
+					Name:      "beadsproject",
+					Path:      "/beads/project",
+					TechStack: "Go + Beads",
+				},
+				Storage: config.StorageConfig{
+					Backend: "beads",
+				},
+				Execution: config.ExecutionConfig{
+					Coordinator: config.CoordinatorConfig{
+						MaxSubtasks: 3,
+					},
+				},
+			},
+			task: &storage.Task{
+				ID:          "BD-5",
+				Title:       "Complex beads task",
+				Description: "A complex task requiring beads",
+				AcceptanceCriteria: []string{
+					"Beads integration works",
+				},
+			},
+			expectContains: []string{
+				"beadsproject",
+				"Go + Beads",
+				"/beads/project",
+				"BD-5",
+				"Complex beads task",
+				"3",
+				"bd update BD-5 --claim",
+				"--parent BD-5",
+				SentinelProceed,
+				SentinelDecomposed,
+			},
+			expectError: false,
+		},
+		{
+			name: "default max subtasks when zero",
+			cfg: &config.Config{
+				Project: config.ProjectConfig{
+					Name:      "proj",
+					TechStack: "Go",
+					Path:      "/proj",
+				},
+				Storage: config.StorageConfig{Backend: "jsonl"},
+				Execution: config.ExecutionConfig{
+					Coordinator: config.CoordinatorConfig{MaxSubtasks: 0},
+				},
+			},
+			task: &storage.Task{
+				ID:          "DEV-1",
+				Title:       "Task",
+				Description: "Desc",
+			},
+			expectContains: []string{
+				"5", // default max subtasks
+			},
+			expectError: false,
+		},
+		{
+			name: "nil acceptance criteria",
+			cfg: &config.Config{
+				Project: config.ProjectConfig{
+					Name:      "proj",
+					TechStack: "Go",
+					Path:      "/proj",
+				},
+				Storage:   config.StorageConfig{Backend: "jsonl"},
+				Execution: config.ExecutionConfig{Coordinator: config.CoordinatorConfig{MaxSubtasks: 5}},
+			},
+			task: &storage.Task{
+				ID:                 "DEV-2",
+				Title:              "Task with no criteria",
+				Description:        "Desc",
+				AcceptanceCriteria: nil,
+			},
+			expectContains: []string{
+				"DEV-2",
+				"Task with no criteria",
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := RenderCoordinatorPrompt(tt.cfg, tt.task)
+
+			if tt.expectError && err == nil {
+				t.Errorf("expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if !tt.expectError {
+				for _, expected := range tt.expectContains {
+					if !strings.Contains(result, expected) {
+						t.Errorf("expected prompt to contain %q, but it didn't.\nGot:\n%s", expected, result)
+					}
+				}
+
+				// Ensure no template delimiters leak through
+				if strings.Contains(result, "{{") || strings.Contains(result, "}}") {
+					t.Errorf("output contains unrendered template delimiters:\n%s", result)
+				}
+			}
+		})
+	}
+}
+
+func TestRenderCoordinatorPromptBackendInstructions(t *testing.T) {
+	baseTask := &storage.Task{
+		ID:          "DEV-99",
+		Title:       "Test task",
+		Description: "Test description",
+	}
+
+	t.Run("jsonl instructions do not contain bd commands", func(t *testing.T) {
+		cfg := &config.Config{
+			Storage: config.StorageConfig{Backend: "jsonl"},
+			Execution: config.ExecutionConfig{
+				Coordinator: config.CoordinatorConfig{MaxSubtasks: 5},
+			},
+		}
+		result, err := RenderCoordinatorPrompt(cfg, baseTask)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(result, "bd update") || strings.Contains(result, "bd create") {
+			t.Errorf("JSONL backend should not include bd commands")
+		}
+		if !strings.Contains(result, "coordinator-output.json") {
+			t.Errorf("JSONL backend should mention coordinator-output.json")
+		}
+	})
+
+	t.Run("beads instructions contain task ID in commands", func(t *testing.T) {
+		cfg := &config.Config{
+			Storage: config.StorageConfig{Backend: "beads"},
+			Execution: config.ExecutionConfig{
+				Coordinator: config.CoordinatorConfig{MaxSubtasks: 5},
+			},
+		}
+		result, err := RenderCoordinatorPrompt(cfg, baseTask)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result, "bd update DEV-99 --claim") {
+			t.Errorf("Beads backend should include bd update with task ID")
+		}
+		if !strings.Contains(result, "--parent DEV-99") {
+			t.Errorf("Beads backend should include bd create with --parent and task ID")
+		}
+		if strings.Contains(result, "coordinator-output.json") {
+			t.Errorf("Beads backend should not mention coordinator-output.json")
+		}
+	})
+}
+
 func TestRenderTodoPromptOutput(t *testing.T) {
 	// Test that output is valid and doesn't have template errors
 	project := config.ProjectConfig{

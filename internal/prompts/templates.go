@@ -155,6 +155,114 @@ func RenderTodoPrompt(project config.ProjectConfig, todos []processor.TodoItem, 
 	return buf.String(), nil
 }
 
+// Sentinel values output by the coordinator agent to indicate its decision.
+const (
+	SentinelProceed    = "##DEVLOOP:PROCEED##"
+	SentinelDecomposed = "##DEVLOOP:DECOMPOSED##"
+)
+
+// CoordinatorPrompt is the template for the coordinator agent that decides whether
+// to decompose a complex task into focused subtasks.
+const CoordinatorPrompt = `You are the devloop Coordinator Agent. Your role is to analyze a complex task and decide
+whether to decompose it into smaller, focused subtasks.
+
+## Project Context
+Name: {{.ProjectName}}
+Tech Stack: {{.TechStack}}
+Path: {{.ProjectPath}}
+
+## Task to Evaluate
+ID: {{.TaskID}}
+Title: {{.Title}}
+Description: {{.Description}}
+
+Acceptance Criteria:
+{{range .AcceptanceCriteria}}- {{.}}
+{{end}}
+## Task Store Commands
+You have access to the following commands to create and link subtasks:
+{{.TaskStoreInstructions}}
+
+## Instructions
+1. Analyze this task carefully.
+2. If the task is focused enough to be implemented in one coding session (even if it's complex):
+   Output exactly on its own line: ##DEVLOOP:PROCEED##
+3. If the task genuinely needs to be split (multiple distinct components or concerns):
+   - Create 2 to {{.MaxSubtasks}} focused subtasks using the task store commands
+   - Each subtask must be independently implementable and verifiable
+   - Use dependencies to order subtasks when necessary
+   - After creating subtasks, output on its own line: ##DEVLOOP:DECOMPOSED##
+
+Output ONLY the commands (one per line) followed by the sentinel.
+Do not explain your reasoning. Do not include any other text.`
+
+// jsonlCoordinatorInstructions are the task store commands for the JSONL backend.
+const jsonlCoordinatorInstructions = `Write subtask definitions as a JSON array to the file .devloop/coordinator-output.json.
+Each object must have: title, description, complexity, acceptance_criteria, blocked_by, tags.`
+
+// beadsCoordinatorInstructions is the format string for Beads backend task store commands.
+// The single %s placeholder is replaced with the parent task ID.
+const beadsCoordinatorInstructionsFmt = `bd update %s --claim                                        : claim the parent task
+bd create "<title>" --parent %s --body-file=desc.md --json  : create subtask (auto-assigns %s.1, .2, etc.)`
+
+// CoordinatorPromptData holds data for rendering the coordinator prompt.
+type CoordinatorPromptData struct {
+	ProjectName           string
+	TechStack             string
+	ProjectPath           string
+	TaskID                string
+	Title                 string
+	Description           string
+	AcceptanceCriteria    []string
+	TaskStoreInstructions string
+	MaxSubtasks           int
+}
+
+// RenderCoordinatorPrompt generates a prompt for the coordinator agent.
+// The TaskStoreInstructions field is populated based on cfg.Storage.Backend.
+func RenderCoordinatorPrompt(cfg *config.Config, task *storage.Task) (string, error) {
+	criteria := task.AcceptanceCriteria
+	if criteria == nil {
+		criteria = []string{}
+	}
+
+	maxSubtasks := cfg.Execution.Coordinator.MaxSubtasks
+	if maxSubtasks <= 0 {
+		maxSubtasks = 5
+	}
+
+	var taskStoreInstructions string
+	if cfg.Storage.Backend == "beads" {
+		taskStoreInstructions = fmt.Sprintf(beadsCoordinatorInstructionsFmt, task.ID, task.ID, task.ID)
+	} else {
+		taskStoreInstructions = jsonlCoordinatorInstructions
+	}
+
+	data := CoordinatorPromptData{
+		ProjectName:           cfg.Project.Name,
+		TechStack:             cfg.Project.TechStack,
+		ProjectPath:           cfg.Project.Path,
+		TaskID:                task.ID,
+		Title:                 task.Title,
+		Description:           task.Description,
+		AcceptanceCriteria:    criteria,
+		TaskStoreInstructions: taskStoreInstructions,
+		MaxSubtasks:           maxSubtasks,
+	}
+
+	tmpl, err := template.New("coordinator").Parse(CoordinatorPrompt)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse coordinator prompt template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to render coordinator prompt: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
 // RenderTaskPrompt generates a prompt for executing a specific task
 func RenderTaskPrompt(cfg *config.Config, task *storage.Task, attempt int, prevError string) (string, error) {
 	// Build acceptance criteria list
