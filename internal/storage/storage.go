@@ -209,3 +209,28 @@ func (s *Storage) QueryTasks(filter Filter) ([]*Task, error) {
 
 	return filtered, nil
 }
+
+// QueryReadyTasks returns all tasks that are ready to execute
+// (pending status and not blocked by dependencies), sorted by ID
+func (s *Storage) QueryReadyTasks() ([]*Task, error) {
+	// Load all tasks
+	tasks, err := s.LoadTasks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tasks: %w", err)
+	}
+
+	// Filter for ready tasks (pending and unblocked)
+	var ready []*Task
+	for _, task := range tasks {
+		if task.CanStart() {
+			ready = append(ready, task)
+		}
+	}
+
+	// Sort by ID (ascending)
+	sort.Slice(ready, func(i, j int) bool {
+		return compareTaskIDs(ready[i].ID, ready[j].ID)
+	})
+
+	return ready, nil
+}

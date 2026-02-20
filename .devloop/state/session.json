@@ -1,48 +1,39 @@
 {
-  "id": "63a710d6-ffe1-4e1b-a1f4-e7c8d7c7a467",
-  "started_at": "2026-02-18T13:35:56.256884597-05:00",
-  "last_checkpoint": "DEV-23",
-  "tasks_completed": [
-    "DEV-20",
-    "DEV-21",
-    "DEV-22",
-    "DEV-24",
-    "DEV-19",
-    "DEV-23"
-  ],
-  "tasks_failed": [
-    "DEV-19"
-  ],
-  "agent_name": "copilot",
+  "id": "4c4f5837-1d60-4a0d-99cd-b2dd1171c0e9",
+  "started_at": "2026-02-19T19:07:11.857437438-05:00",
+  "last_checkpoint": "",
+  "tasks_completed": [],
+  "tasks_failed": [],
+  "agent_name": "claude",
   "model_map": {
-    "complex": "claude-opus-4.6",
-    "moderate": "claude-sonnet-4.6",
-    "simple": "claude-haiku-4.5"
+    "complex": "opus",
+    "moderate": "sonnet",
+    "simple": "haiku"
   },
   "task_snapshot": [
     {
-      "id": "DEV-20",
-      "title": "Add --dry-run flag support to all commands",
+      "id": "DEV-25",
+      "title": "Define TaskStore interface in internal/storage",
       "status": "pending",
-      "complexity": "moderate"
+      "complexity": "simple"
     },
     {
-      "id": "DEV-21",
-      "title": "Add context-based cancellation and graceful shutdown",
+      "id": "DEV-27",
+      "title": "Add StorageConfig to config schema",
       "status": "pending",
-      "complexity": "moderate"
+      "complexity": "simple"
     },
     {
-      "id": "DEV-22",
-      "title": "Add golangci-lint configuration and fix lint issues",
+      "id": "DEV-42",
+      "title": "Add KnowledgeConfig to config schema",
       "status": "pending",
-      "complexity": "moderate"
+      "complexity": "simple"
     },
     {
-      "id": "DEV-24",
-      "title": "Clean out legacy config items and task migration code",
+      "id": "DEV-49",
+      "title": "Add CoordinatorConfig to ExecutionConfig",
       "status": "pending",
-      "complexity": "moderate"
+      "complexity": "simple"
     }
   ]
 }
