@@ -92,3 +92,83 @@ func (s *BeadsStore) writeIDMapping(ctx context.Context, devloopID, beadsID stri
 
 	return nil
 }
+
+// BeadsStatusInfo represents a Beads task status with optional labels
+type BeadsStatusInfo struct {
+	Status string   // "open", "in_progress", "closed", "blocked"
+	Labels []string // optional labels like "failed", "compacted"
+}
+
+// devloopStatusToBeads converts a devloop task status to Beads status representation.
+// Maps:
+//   - pending → open
+//   - in_progress → in_progress
+//   - completed → closed
+//   - failed → closed + "failed" label
+//   - blocked → blocked
+//   - archived → closed + "compacted" label
+// Unknown statuses return "open" with a warning.
+func devloopStatusToBeads(devloopStatus string) BeadsStatusInfo {
+	switch devloopStatus {
+	case "pending":
+		return BeadsStatusInfo{Status: "open"}
+	case "in_progress":
+		return BeadsStatusInfo{Status: "in_progress"}
+	case "completed":
+		return BeadsStatusInfo{Status: "closed"}
+	case "failed":
+		return BeadsStatusInfo{Status: "closed", Labels: []string{"failed"}}
+	case "blocked":
+		return BeadsStatusInfo{Status: "blocked"}
+	case "archived":
+		return BeadsStatusInfo{Status: "closed", Labels: []string{"compacted"}}
+	default:
+		fmt.Printf("WARNING: unknown devloop status %q, using default 'open'\n", devloopStatus)
+		return BeadsStatusInfo{Status: "open"}
+	}
+}
+
+// beadsStatusToDevloop converts a Beads task status to a devloop task status.
+// Maps:
+//   - open → pending
+//   - in_progress → in_progress
+//   - closed (no labels) → completed
+//   - closed + "failed" label → failed
+//   - closed + "compacted" label → archived
+//   - blocked → blocked
+// Unknown Beads statuses return "pending" with a warning.
+// When multiple labels are present, "failed" takes priority over "compacted".
+func beadsStatusToDevloop(beadsStatus BeadsStatusInfo) string {
+	switch beadsStatus.Status {
+	case "open":
+		return "pending"
+	case "in_progress":
+		return "in_progress"
+	case "blocked":
+		return "blocked"
+	case "closed":
+		// Check labels to determine exact devloop status
+		// Priority: "failed" > "compacted" > no label
+		hasFailed := false
+		hasCompacted := false
+		for _, label := range beadsStatus.Labels {
+			if label == "failed" {
+				hasFailed = true
+			}
+			if label == "compacted" {
+				hasCompacted = true
+			}
+		}
+		if hasFailed {
+			return "failed"
+		}
+		if hasCompacted {
+			return "archived"
+		}
+		// closed without special labels means completed
+		return "completed"
+	default:
+		fmt.Printf("WARNING: unknown Beads status %q, using default 'pending'\n", beadsStatus.Status)
+		return "pending"
+	}
+}

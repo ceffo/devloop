@@ -288,3 +288,180 @@ func TestWriteIDMapping_SecondSetFails(t *testing.T) {
 		t.Errorf("expected 2 exec calls, got %d", callCount)
 	}
 }
+
+// --- devloopStatusToBeads tests ---
+
+func TestDevloopStatusToBeads(t *testing.T) {
+	tests := []struct {
+		name             string
+		devloopStatus    string
+		expectedStatus   string
+		expectedLabels   []string
+	}{
+		{
+			name:           "pending maps to open",
+			devloopStatus:  "pending",
+			expectedStatus: "open",
+			expectedLabels: []string{},
+		},
+		{
+			name:           "in_progress maps to in_progress",
+			devloopStatus:  "in_progress",
+			expectedStatus: "in_progress",
+			expectedLabels: []string{},
+		},
+		{
+			name:           "completed maps to closed",
+			devloopStatus:  "completed",
+			expectedStatus: "closed",
+			expectedLabels: []string{},
+		},
+		{
+			name:           "failed maps to closed with failed label",
+			devloopStatus:  "failed",
+			expectedStatus: "closed",
+			expectedLabels: []string{"failed"},
+		},
+		{
+			name:           "blocked maps to blocked",
+			devloopStatus:  "blocked",
+			expectedStatus: "blocked",
+			expectedLabels: []string{},
+		},
+		{
+			name:           "archived maps to closed with compacted label",
+			devloopStatus:  "archived",
+			expectedStatus: "closed",
+			expectedLabels: []string{"compacted"},
+		},
+		{
+			name:           "unknown status defaults to open with warning",
+			devloopStatus:  "unknown_status",
+			expectedStatus: "open",
+			expectedLabels: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := devloopStatusToBeads(tt.devloopStatus)
+
+			if result.Status != tt.expectedStatus {
+				t.Errorf("expected status %q, got %q", tt.expectedStatus, result.Status)
+			}
+
+			if !stringSlicesEqual(result.Labels, tt.expectedLabels) {
+				t.Errorf("expected labels %v, got %v", tt.expectedLabels, result.Labels)
+			}
+		})
+	}
+}
+
+// --- beadsStatusToDevloop tests ---
+
+func TestBeadsStatusToDevloop(t *testing.T) {
+	tests := []struct {
+		name            string
+		beadsStatus     BeadsStatusInfo
+		expectedStatus  string
+	}{
+		{
+			name:           "open maps to pending",
+			beadsStatus:    BeadsStatusInfo{Status: "open"},
+			expectedStatus: "pending",
+		},
+		{
+			name:           "in_progress maps to in_progress",
+			beadsStatus:    BeadsStatusInfo{Status: "in_progress"},
+			expectedStatus: "in_progress",
+		},
+		{
+			name:           "closed without labels maps to completed",
+			beadsStatus:    BeadsStatusInfo{Status: "closed"},
+			expectedStatus: "completed",
+		},
+		{
+			name:           "closed with failed label maps to failed",
+			beadsStatus:    BeadsStatusInfo{Status: "closed", Labels: []string{"failed"}},
+			expectedStatus: "failed",
+		},
+		{
+			name:           "closed with compacted label maps to archived",
+			beadsStatus:    BeadsStatusInfo{Status: "closed", Labels: []string{"compacted"}},
+			expectedStatus: "archived",
+		},
+		{
+			name:           "closed with multiple labels including failed maps to failed",
+			beadsStatus:    BeadsStatusInfo{Status: "closed", Labels: []string{"compacted", "failed"}},
+			expectedStatus: "failed",
+		},
+		{
+			name:           "closed with multiple labels including compacted maps to archived",
+			beadsStatus:    BeadsStatusInfo{Status: "closed", Labels: []string{"other", "compacted"}},
+			expectedStatus: "archived",
+		},
+		{
+			name:           "blocked maps to blocked",
+			beadsStatus:    BeadsStatusInfo{Status: "blocked"},
+			expectedStatus: "blocked",
+		},
+		{
+			name:           "unknown Beads status defaults to pending with warning",
+			beadsStatus:    BeadsStatusInfo{Status: "unknown"},
+			expectedStatus: "pending",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := beadsStatusToDevloop(tt.beadsStatus)
+
+			if result != tt.expectedStatus {
+				t.Errorf("expected status %q, got %q", tt.expectedStatus, result)
+			}
+		})
+	}
+}
+
+// --- Roundtrip tests ---
+
+func TestStatusMappingRoundtrip(t *testing.T) {
+	tests := []struct {
+		name          string
+		devloopStatus string
+		expectedRoundtrip string
+	}{
+		{"pending roundtrips", "pending", "pending"},
+		{"in_progress roundtrips", "in_progress", "in_progress"},
+		{"completed roundtrips", "completed", "completed"},
+		{"failed roundtrips", "failed", "failed"},
+		{"blocked roundtrips", "blocked", "blocked"},
+		{"archived roundtrips", "archived", "archived"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// devloop → beads → devloop
+			beadsStatus := devloopStatusToBeads(tt.devloopStatus)
+			devloopStatus := beadsStatusToDevloop(beadsStatus)
+
+			if devloopStatus != tt.expectedRoundtrip {
+				t.Errorf("roundtrip failed: %q → %+v → %q, expected %q",
+					tt.devloopStatus, beadsStatus, devloopStatus, tt.expectedRoundtrip)
+			}
+		})
+	}
+}
+
+// Helper function to compare string slices
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
