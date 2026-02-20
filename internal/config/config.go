@@ -20,6 +20,7 @@ type Config struct {
 	Archival     ArchivalConfig     `json:"archival,omitempty"`
 	Prompts      PromptsConfig      `json:"prompts,omitempty"`
 	Storage      StorageConfig      `json:"storage,omitempty"`
+	Knowledge    KnowledgeConfig    `json:"knowledge,omitempty"`
 }
 
 // ProjectConfig holds project-specific metadata
@@ -86,6 +87,15 @@ type PromptsConfig struct {
 // StorageConfig defines storage backend configuration
 type StorageConfig struct {
 	Backend string `json:"backend"`
+}
+
+// KnowledgeConfig defines knowledge management configuration
+type KnowledgeConfig struct {
+	Backend          string   `json:"backend"`
+	Domains          []string `json:"domains,omitempty"`
+	PrimeBudget      int      `json:"prime_budget"`
+	InjectOnExecute  bool     `json:"inject_on_execute"`
+	RecordOnComplete bool     `json:"record_on_complete"`
 }
 
 // GetAgent returns the AgentConfig for the given agent name
@@ -224,6 +234,12 @@ func getDefaultConfig() *Config {
 		Storage: StorageConfig{
 			Backend: "jsonl",
 		},
+		Knowledge: KnowledgeConfig{
+			Backend:          "none",
+			PrimeBudget:      2000,
+			InjectOnExecute:  false,
+			RecordOnComplete: false,
+		},
 	}
 }
 
@@ -269,6 +285,22 @@ func applyDefaults(cfg *Config) {
 	// Set storage backend default to 'jsonl' if empty
 	if cfg.Storage.Backend == "" {
 		cfg.Storage.Backend = "jsonl"
+	}
+
+	// Apply Knowledge config defaults
+	if cfg.Knowledge.Backend == "" {
+		cfg.Knowledge.Backend = "none"
+	}
+
+	// Set PrimeBudget to 2000 if zero and backend is set
+	if cfg.Knowledge.PrimeBudget == 0 {
+		cfg.Knowledge.PrimeBudget = 2000
+	}
+
+	// Set InjectOnExecute and RecordOnComplete to true when backend is not 'none'
+	if cfg.Knowledge.Backend != "none" {
+		cfg.Knowledge.InjectOnExecute = true
+		cfg.Knowledge.RecordOnComplete = true
 	}
 }
 
