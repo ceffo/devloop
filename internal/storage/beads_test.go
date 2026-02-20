@@ -1093,3 +1093,303 @@ func joinArgs(args []string) string {
 	}
 	return result
 }
+
+// --- SaveTask tests ---
+
+// mockExecCommandSequence returns a mock that cycles through shell commands in order.
+// Each call consumes the next command; the last command is repeated for any extra calls.
+func mockExecCommandSequence(shellCmds []string, capturedArgs *[][]string) func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	idx := 0
+	return func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		if capturedArgs != nil {
+			*capturedArgs = append(*capturedArgs, append([]string{name}, args...))
+		}
+		cmd := shellCmds[idx]
+		if idx < len(shellCmds)-1 {
+			idx++
+		}
+		return exec.CommandContext(ctx, "sh", "-c", cmd)
+	}
+}
+
+func TestSaveTask_BasicCreationFlow(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	var capturedArgs [][]string
+	orig := execCommandContextFunc
+	// Sequence: bd create → bd kv set (devloop:) → bd kv set (beads:)
+	execCommandContextFunc = mockExecCommandSequence([]string{
+		`echo '{"id":"bd-a1b2"}'`, // bd create --json
+		"true",                    // bd kv set devloop:DEV-1 bd-a1b2
+		"true",                    // bd kv set beads:bd-a1b2 DEV-1
+	}, &capturedArgs)
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:                 "DEV-1",
+		Title:              "My task",
+		Description:        "Do something useful",
+		Complexity:         "simple",
+		AcceptanceCriteria: []string{"it works"},
+		Tags:               []string{"backend"},
+	}
+	task.Metadata.MaxAttempts = 3
+
+	if err := store.SaveTask(context.Background(), task); err != nil {
+		t.Fatalf("SaveTask failed: %v", err)
+	}
+
+	// Verify bd create was called with --body-file and --json
+	if len(capturedArgs) < 1 {
+		t.Fatal("expected at least one exec call")
+	}
+	createCall := joinArgs(capturedArgs[0])
+	if !contains(createCall, "create") {
+		t.Errorf("expected 'create' in first call: %v", capturedArgs[0])
+	}
+	if !contains(createCall, "--body-file") {
+		t.Errorf("expected '--body-file' in create call: %v", capturedArgs[0])
+	}
+	if !contains(createCall, "--json") {
+		t.Errorf("expected '--json' in create call: %v", capturedArgs[0])
+	}
+	if !contains(createCall, "My task") {
+		t.Errorf("expected title 'My task' in create call: %v", capturedArgs[0])
+	}
+
+	// Verify KV mapping calls
+	if len(capturedArgs) < 3 {
+		t.Fatalf("expected at least 3 exec calls (create + 2 kv set), got %d", len(capturedArgs))
+	}
+	kvCall1 := joinArgs(capturedArgs[1])
+	if !contains(kvCall1, "kv") || !contains(kvCall1, "set") {
+		t.Errorf("expected 'kv set' in second call: %v", capturedArgs[1])
+	}
+	if !contains(kvCall1, "devloop:DEV-1") {
+		t.Errorf("expected 'devloop:DEV-1' in kv set call: %v", capturedArgs[1])
+	}
+	if !contains(kvCall1, "bd-a1b2") {
+		t.Errorf("expected 'bd-a1b2' in kv set call: %v", capturedArgs[1])
+	}
+
+	kvCall2 := joinArgs(capturedArgs[2])
+	if !contains(kvCall2, "kv") || !contains(kvCall2, "set") {
+		t.Errorf("expected 'kv set' in third call: %v", capturedArgs[2])
+	}
+	if !contains(kvCall2, "beads:bd-a1b2") {
+		t.Errorf("expected 'beads:bd-a1b2' in kv set call: %v", capturedArgs[2])
+	}
+	if !contains(kvCall2, "DEV-1") {
+		t.Errorf("expected 'DEV-1' in kv set call: %v", capturedArgs[2])
+	}
+
+	// Verify sidecar was written
+	sidecar, err := store.readSidecar("bd-a1b2")
+	if err != nil {
+		t.Fatalf("readSidecar failed: %v", err)
+	}
+	if sidecar == nil {
+		t.Fatal("expected sidecar to be written")
+	}
+	if sidecar.DevloopID != "DEV-1" {
+		t.Errorf("DevloopID: expected DEV-1, got %q", sidecar.DevloopID)
+	}
+	if sidecar.Complexity != "simple" {
+		t.Errorf("Complexity: expected simple, got %q", sidecar.Complexity)
+	}
+	if len(sidecar.AcceptanceCriteria) != 1 || sidecar.AcceptanceCriteria[0] != "it works" {
+		t.Errorf("AcceptanceCriteria: expected [it works], got %v", sidecar.AcceptanceCriteria)
+	}
+	if len(sidecar.Tags) != 1 || sidecar.Tags[0] != "backend" {
+		t.Errorf("Tags: expected [backend], got %v", sidecar.Tags)
+	}
+	if sidecar.MaxAttempts != 3 {
+		t.Errorf("MaxAttempts: expected 3, got %d", sidecar.MaxAttempts)
+	}
+}
+
+func TestSaveTask_WithDependencies(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	var capturedArgs [][]string
+	orig := execCommandContextFunc
+	// Sequence: bd create → 2x kv set → bd kv get DEV-2 → bd dep add
+	execCommandContextFunc = mockExecCommandSequence([]string{
+		`echo '{"id":"bd-c3d4"}'`, // bd create
+		"true",                    // bd kv set devloop:DEV-3
+		"true",                    // bd kv set beads:bd-c3d4
+		"echo bd-e5f6",            // bd kv get devloop:DEV-2
+		"true",                    // bd dep add
+	}, &capturedArgs)
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:          "DEV-3",
+		Title:       "Dependent task",
+		Description: "Depends on DEV-2",
+		BlockedBy:   []string{"DEV-2"},
+	}
+
+	if err := store.SaveTask(context.Background(), task); err != nil {
+		t.Fatalf("SaveTask with dependency failed: %v", err)
+	}
+
+	// Should have 5 calls: create, 2 kv set, kv get (resolve dep), dep add
+	if len(capturedArgs) != 5 {
+		t.Fatalf("expected 5 exec calls, got %d: %v", len(capturedArgs), capturedArgs)
+	}
+
+	// Verify dep add call
+	depCall := joinArgs(capturedArgs[4])
+	if !contains(depCall, "dep") || !contains(depCall, "add") {
+		t.Errorf("expected 'dep add' in last call: %v", capturedArgs[4])
+	}
+	if !contains(depCall, "bd-c3d4") {
+		t.Errorf("expected task ID 'bd-c3d4' in dep add call: %v", capturedArgs[4])
+	}
+	if !contains(depCall, "bd-e5f6") {
+		t.Errorf("expected dep ID 'bd-e5f6' in dep add call: %v", capturedArgs[4])
+	}
+}
+
+func TestSaveTask_TempFileCleanedUp(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	var tempFilePath string
+	orig := execCommandContextFunc
+	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		// Capture the --body-file path from the create call
+		for i, arg := range args {
+			if arg == "--body-file" && i+1 < len(args) {
+				tempFilePath = args[i+1]
+			}
+		}
+		if len(args) > 0 && args[0] == "create" {
+			return exec.CommandContext(ctx, "sh", "-c", `echo '{"id":"bd-g7h8"}'`)
+		}
+		return exec.CommandContext(ctx, "sh", "-c", "true")
+	}
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:          "DEV-4",
+		Title:       "Cleanup test",
+		Description: "Check temp file removal",
+	}
+
+	if err := store.SaveTask(context.Background(), task); err != nil {
+		t.Fatalf("SaveTask failed: %v", err)
+	}
+
+	if tempFilePath == "" {
+		t.Fatal("expected --body-file path to be captured")
+	}
+
+	// Temp file should be removed after SaveTask
+	fileExistsCmd := exec.Command("sh", "-c", "test -f "+tempFilePath)
+	if fileExistsCmd.Run() == nil {
+		t.Errorf("temp file %q should have been removed after SaveTask", tempFilePath)
+	}
+}
+
+func TestSaveTask_BdCreateFails(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("exit 1", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:          "DEV-5",
+		Title:       "Failing task",
+		Description: "This should fail",
+	}
+
+	err := store.SaveTask(context.Background(), task)
+	if err == nil {
+		t.Fatal("SaveTask should fail when bd create fails")
+	}
+	if !contains(err.Error(), "bd create failed") {
+		t.Errorf("expected 'bd create failed' in error, got: %v", err)
+	}
+}
+
+func TestSaveTask_BdCreateReturnsInvalidJSON(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("echo 'not json'", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:          "DEV-6",
+		Title:       "JSON test",
+		Description: "Test invalid JSON response",
+	}
+
+	err := store.SaveTask(context.Background(), task)
+	if err == nil {
+		t.Fatal("SaveTask should fail when bd create returns invalid JSON")
+	}
+	if !contains(err.Error(), "failed to parse bd create JSON output") {
+		t.Errorf("expected JSON parse error, got: %v", err)
+	}
+}
+
+func TestSaveTask_BdCreateReturnsEmptyID(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand(`echo '{"id":""}'`, nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:          "DEV-7",
+		Title:       "Empty ID test",
+		Description: "Test empty ID response",
+	}
+
+	err := store.SaveTask(context.Background(), task)
+	if err == nil {
+		t.Fatal("SaveTask should fail when bd create returns empty ID")
+	}
+	if !contains(err.Error(), "bd create returned empty ID") {
+		t.Errorf("expected 'bd create returned empty ID' in error, got: %v", err)
+	}
+}
+
+func TestSaveTask_DepAddFails(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	callCount := 0
+	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		callCount++
+		switch callCount {
+		case 1: // bd create
+			return exec.CommandContext(ctx, "sh", "-c", `echo '{"id":"bd-i9j0"}'`)
+		case 2, 3: // bd kv set
+			return exec.CommandContext(ctx, "sh", "-c", "true")
+		case 4: // bd kv get (resolve dep)
+			return exec.CommandContext(ctx, "sh", "-c", "echo bd-k1l2")
+		default: // bd dep add - fail
+			return exec.CommandContext(ctx, "sh", "-c", "exit 1")
+		}
+	}
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:          "DEV-8",
+		Title:       "Dep fail test",
+		Description: "Test dep add failure",
+		BlockedBy:   []string{"DEV-9"},
+	}
+
+	err := store.SaveTask(context.Background(), task)
+	if err == nil {
+		t.Fatal("SaveTask should fail when bd dep add fails")
+	}
+	if !contains(err.Error(), "bd dep add") {
+		t.Errorf("expected 'bd dep add' in error, got: %v", err)
+	}
+}
