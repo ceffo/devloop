@@ -275,6 +275,28 @@ func getReadyTasksForExecution(store *storage.Storage, filter storage.Filter, ta
 		return nil, fmt.Errorf("failed to query tasks: %w", err)
 	}
 
+	// On resume, also include failed and in_progress tasks so they get retried.
+	// In_progress tasks are reset to pending first (they were interrupted mid-run).
+	if continueSession {
+		resumeFilter := filter
+		for _, status := range []string{"failed", "in_progress"} {
+			resumeFilter.Status = status
+			extraTasks, err := store.QueryTasks(resumeFilter)
+			if err != nil {
+				return nil, fmt.Errorf("failed to query %s tasks for resume: %w", status, err)
+			}
+			if status == "in_progress" {
+				for _, t := range extraTasks {
+					t.Status = "pending"
+					if err := store.UpdateTask(t); err != nil {
+						return nil, fmt.Errorf("failed to reset in_progress task %s: %w", t.ID, err)
+					}
+				}
+			}
+			allPendingTasks = append(allPendingTasks, extraTasks...)
+		}
+	}
+
 	// Filter to only tasks whose dependencies are completed
 	tasks, err := filterReadyTasks(store, allPendingTasks)
 	if err != nil {
@@ -293,9 +315,11 @@ func getReadyTasksForExecution(store *storage.Storage, filter storage.Filter, ta
 		tasks = filteredTasks
 	}
 
-	// Handle resume from checkpoint
-	if continueSession && session.LastCheckpoint != "" {
-		tasks = filterTasksAfterCheckpoint(tasks, session.LastCheckpoint)
+	// On resume, skip tasks already completed in this session rather than
+	// using position-based filtering (which breaks when the checkpoint task
+	// is not in the pending list, e.g. it failed or was interrupted).
+	if continueSession {
+		tasks = filterTasksForResume(tasks, session)
 	}
 
 	return tasks, nil
@@ -477,6 +501,22 @@ func filterTasksAfterCheckpoint(tasks []*storage.Task, checkpointID string) []*s
 		}
 	}
 
+	return filtered
+}
+
+// filterTasksForResume excludes tasks already successfully completed in this session.
+// Used during resume to skip work already done while retrying failed/incomplete tasks.
+func filterTasksForResume(tasks []*storage.Task, session *Session) []*storage.Task {
+	completedSet := make(map[string]bool, len(session.TasksCompleted))
+	for _, id := range session.TasksCompleted {
+		completedSet[id] = true
+	}
+	var filtered []*storage.Task
+	for _, task := range tasks {
+		if !completedSet[task.ID] {
+			filtered = append(filtered, task)
+		}
+	}
 	return filtered
 }
 
