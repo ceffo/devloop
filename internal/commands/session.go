@@ -108,7 +108,7 @@ func sessionRecoverCmd() *cobra.Command {
 				return fmt.Errorf("no previous session found - run 'devloop run' to start a new session")
 			}
 
-			return executor.ExecuteDevLoop(cmd.Context(), cfg, "", true, false, agentName)
+			return executor.ExecuteDevLoop(cmd.Context(), cfg, "", true, false, agentName, false)
 		},
 	}
 

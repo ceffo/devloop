@@ -11,9 +11,10 @@ import (
 // RunCmd returns the run command
 func RunCmd() *cobra.Command {
 	var (
-		taskID          string
-		continueSession bool
-		resumeSession   bool
+		taskID           string
+		continueSession  bool
+		resumeSession    bool
+		coordinateEnabled bool
 	)
 
 	cmd := &cobra.Command{
@@ -29,6 +30,7 @@ Flags:
   --task ID      Run a specific task by ID
   --continue     Resume execution from last checkpoint
   --dry-run      Show what would be executed without running
+  --coordinate   Enable coordinator for this run (does not modify config)
 
 Global flags:
   --agent NAME   Use specific agent from config (default: first in list)
@@ -74,7 +76,7 @@ Examples:
 			shouldResume := continueSession || resumeSession
 
 			// Execute dev loop
-			err = executor.ExecuteDevLoop(cmd.Context(), cfg, taskID, shouldResume, dryRun, agentName)
+			err = executor.ExecuteDevLoop(cmd.Context(), cfg, taskID, shouldResume, dryRun, agentName, coordinateEnabled)
 			if err != nil {
 				return err
 			}
@@ -87,6 +89,7 @@ Examples:
 	cmd.Flags().StringVar(&taskID, "task", "", "run specific task by ID")
 	cmd.Flags().BoolVar(&continueSession, "continue", false, "resume from last checkpoint")
 	cmd.Flags().BoolVar(&resumeSession, "resume", false, "resume from last checkpoint (alias for --continue)")
+	cmd.Flags().BoolVar(&coordinateEnabled, "coordinate", false, "enable coordinator for this run (overrides config, does not persist)")
 
 	return cmd
 }

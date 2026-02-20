@@ -48,7 +48,7 @@ RunE: func(cmd *cobra.Command, _ []string) error {
 				return fmt.Errorf("no previous session found - run 'devloop run' to start a new session")
 			}
 
-			return executor.ExecuteDevLoop(cmd.Context(), cfg, "", true, dryRun, agentName)
+			return executor.ExecuteDevLoop(cmd.Context(), cfg, "", true, dryRun, agentName, false)
 		},
 	}
 

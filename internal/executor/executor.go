@@ -29,7 +29,12 @@ import (
 //   - continueSession: Whether to resume from last checkpoint
 //   - dryRun: If true, only show what would be executed without running
 //   - agentName: Name of agent to use (empty = default agent)
-func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, continueSession bool, dryRun bool, agentName string) error {
+//   - coordinateEnabled: If true, enable coordinator for this run (overrides config, does not persist)
+func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, continueSession bool, dryRun bool, agentName string, coordinateEnabled bool) error {
+	// Apply --coordinate flag override without modifying the config file
+	if coordinateEnabled {
+		cfg.Execution.Coordinator.Enabled = true
+	}
 	// Use a derived context so we can cancel internally if needed (e.g. from TUI)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -183,8 +188,8 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 		notifier.Log(fmt.Sprintf("Task %d: %s - %s [%s/%s/%s]",
 			taskNumber, task.ID, task.Title, task.Complexity, model, selectedAgentName))
 
-		// Run coordinator (if enabled) to decide whether to decompose the task
-		if cfg.Execution.Coordinator.Enabled {
+		// Run coordinator (if enabled) for complex tasks only
+		if cfg.Execution.Coordinator.Enabled && task.Complexity == "complex" {
 			coordinatorModel := cfg.Execution.Coordinator.Model
 			if coordinatorModel == "" {
 				coordinatorModel = model
