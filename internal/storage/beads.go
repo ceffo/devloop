@@ -370,6 +370,7 @@ func (s *BeadsStore) UpdateTask(ctx context.Context, task *Task) error {
 	}
 	sidecar.Execution = task.Execution
 	sidecar.Results = task.Results
+	sidecar.DecomposedInto = task.DecomposedInto
 	if err := s.writeSidecar(beadsID, sidecar); err != nil {
 		return fmt.Errorf("UpdateTask: failed to write sidecar for %q: %w", beadsID, err)
 	}

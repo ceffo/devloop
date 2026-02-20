@@ -19,6 +19,7 @@ type TaskSidecar struct {
 	MaxAttempts        int           `json:"max_attempts"`
 	Execution          TaskExecution `json:"execution"`
 	Results            *TaskResults  `json:"results,omitempty"`
+	DecomposedInto     []string      `json:"decomposed_into,omitempty"` // Beads IDs of subtasks when coordinator decomposed this task
 }
 
 // beadsTaskData holds task fields sourced from the Beads system.
@@ -92,6 +93,7 @@ func mergeSidecar(bd beadsTaskData, sidecar *TaskSidecar) *Task {
 		task.Metadata.MaxAttempts = sidecar.MaxAttempts
 		task.Execution = sidecar.Execution
 		task.Results = sidecar.Results
+		task.DecomposedInto = sidecar.DecomposedInto
 	}
 
 	return task

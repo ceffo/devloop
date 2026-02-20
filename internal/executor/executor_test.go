@@ -599,6 +599,11 @@ func TestRunCoordinatorDecomposedJSONL(t *testing.T) {
 		Status:      "pending",
 	}
 
+	// Save parent task so UpdateTask can find it after decomposition.
+	if err := store.SaveTask(task); err != nil {
+		t.Fatalf("Failed to save parent task: %v", err)
+	}
+
 	runner := &mockOutputRunner{
 		output:  "Creating subtasks...\n##DEVLOOP:DECOMPOSED##\n",
 		success: true,
@@ -639,6 +644,18 @@ func TestRunCoordinatorDecomposedJSONL(t *testing.T) {
 	} else if saved2.Complexity != "moderate" {
 		t.Errorf("Expected subtask 2 complexity 'moderate', got %q", saved2.Complexity)
 	}
+
+	// Verify parent task was updated with in_progress status and DecomposedInto.
+	parent, err := store.GetTask("DEV-1")
+	if err != nil {
+		t.Fatalf("Failed to load parent task after decomposition: %v", err)
+	}
+	if parent.Status != "in_progress" {
+		t.Errorf("Expected parent status 'in_progress' after decomposition, got %q", parent.Status)
+	}
+	if len(parent.DecomposedInto) != 2 {
+		t.Errorf("Expected parent DecomposedInto to have 2 entries, got %d", len(parent.DecomposedInto))
+	}
 }
 
 // TestRunCoordinatorAgentFailure verifies that an agent failure returns an error.
@@ -676,4 +693,173 @@ func TestRunCoordinatorAgentFailure(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error when agent returns failure, got nil")
 	}
+}
+
+// TestResumeSkipsDecomposedParent verifies that an in_progress parent task with
+// DecomposedInto set is NOT reset to pending during resume. Remaining pending
+// subtasks should be returned as ready, and the coordinator will not be re-invoked
+// because the parent never re-enters the ready queue.
+func TestResumeSkipsDecomposedParent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.Config{
+		Project: config.ProjectConfig{
+			Path:      tmpDir,
+			Name:      "test",
+			TechStack: "Go",
+		},
+		Storage: config.StorageConfig{Backend: "jsonl"},
+		Execution: config.ExecutionConfig{
+			MaxAttempts: 2,
+		},
+	}
+
+	store := storage.NewStorage(cfg)
+
+	// Parent task was already decomposed: in_progress with DecomposedInto set.
+	parent := &storage.Task{
+		ID:             "DEV-5",
+		Title:          "Complex parent",
+		Complexity:     "complex",
+		Status:         "in_progress",
+		DecomposedInto: []string{"DEV-5.1", "DEV-5.2"},
+		Metadata:       storage.TaskMetadata{MaxAttempts: 2},
+		Execution:      storage.TaskExecution{Attempts: []storage.Attempt{}},
+	}
+
+	// First subtask already completed.
+	sub1 := &storage.Task{
+		ID:        "DEV-5.1",
+		Title:     "Subtask 1",
+		Complexity: "simple",
+		Status:    "completed",
+		Metadata:  storage.TaskMetadata{MaxAttempts: 2},
+		Execution: storage.TaskExecution{Attempts: []storage.Attempt{}},
+	}
+
+	// Second subtask still pending.
+	sub2 := &storage.Task{
+		ID:        "DEV-5.2",
+		Title:     "Subtask 2",
+		Complexity: "simple",
+		Status:    "pending",
+		Metadata:  storage.TaskMetadata{MaxAttempts: 2},
+		Execution: storage.TaskExecution{Attempts: []storage.Attempt{}},
+	}
+
+	for _, task := range []*storage.Task{parent, sub1, sub2} {
+		if err := store.SaveTask(task); err != nil {
+			t.Fatalf("Failed to save task %s: %v", task.ID, err)
+		}
+	}
+
+	// Build a session that reflects DEV-5.1 was already completed.
+	session := &Session{
+		ID:             "test-session",
+		TasksCompleted: []string{"DEV-5.1"},
+		TasksFailed:    []string{},
+	}
+
+	tasks, err := getReadyTasksForExecution(store, storage.Filter{}, "", true, session)
+	if err != nil {
+		t.Fatalf("getReadyTasksForExecution returned error: %v", err)
+	}
+
+	// Only DEV-5.2 should be ready; DEV-5 must NOT be in the list.
+	if len(tasks) != 1 {
+		t.Fatalf("Expected 1 ready task, got %d: %v", len(tasks), taskIDs(tasks))
+	}
+	if tasks[0].ID != "DEV-5.2" {
+		t.Errorf("Expected ready task to be DEV-5.2, got %q", tasks[0].ID)
+	}
+
+	// Verify DEV-5 is still in_progress (not reset to pending).
+	savedParent, err := store.GetTask("DEV-5")
+	if err != nil {
+		t.Fatalf("Failed to load parent task: %v", err)
+	}
+	if savedParent.Status != "in_progress" {
+		t.Errorf("Expected parent status to remain 'in_progress', got %q", savedParent.Status)
+	}
+	if len(savedParent.DecomposedInto) != 2 {
+		t.Errorf("Expected parent DecomposedInto to have 2 entries, got %d", len(savedParent.DecomposedInto))
+	}
+}
+
+// TestResumeNormalTasksAreReset verifies that ordinary in_progress/failed tasks
+// (without DecomposedInto) are still reset to pending on resume.
+func TestResumeNormalTasksAreReset(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.Config{
+		Project: config.ProjectConfig{
+			Path:      tmpDir,
+			Name:      "test",
+			TechStack: "Go",
+		},
+		Storage:   config.StorageConfig{Backend: "jsonl"},
+		Execution: config.ExecutionConfig{MaxAttempts: 2},
+	}
+
+	store := storage.NewStorage(cfg)
+
+	inProgress := &storage.Task{
+		ID:        "DEV-1",
+		Title:     "In-progress task",
+		Complexity: "simple",
+		Status:    "in_progress",
+		Metadata:  storage.TaskMetadata{MaxAttempts: 2},
+		Execution: storage.TaskExecution{Attempts: []storage.Attempt{}},
+	}
+
+	failed := &storage.Task{
+		ID:        "DEV-2",
+		Title:     "Failed task",
+		Complexity: "simple",
+		Status:    "failed",
+		Metadata:  storage.TaskMetadata{MaxAttempts: 2},
+		Execution: storage.TaskExecution{Attempts: []storage.Attempt{}},
+	}
+
+	for _, task := range []*storage.Task{inProgress, failed} {
+		if err := store.SaveTask(task); err != nil {
+			t.Fatalf("Failed to save task %s: %v", task.ID, err)
+		}
+	}
+
+	session := &Session{
+		ID:             "test-session",
+		TasksCompleted: []string{},
+		TasksFailed:    []string{},
+	}
+
+	tasks, err := getReadyTasksForExecution(store, storage.Filter{}, "", true, session)
+	if err != nil {
+		t.Fatalf("getReadyTasksForExecution returned error: %v", err)
+	}
+
+	// Both DEV-1 and DEV-2 should be reset to pending and returned as ready.
+	if len(tasks) != 2 {
+		t.Fatalf("Expected 2 ready tasks after reset, got %d: %v", len(tasks), taskIDs(tasks))
+	}
+
+	ids := map[string]bool{}
+	for _, task := range tasks {
+		ids[task.ID] = true
+	}
+	if !ids["DEV-1"] {
+		t.Errorf("Expected DEV-1 to be in the ready list")
+	}
+	if !ids["DEV-2"] {
+		t.Errorf("Expected DEV-2 to be in the ready list")
+	}
+}
+
+// taskIDs is a test helper that returns a slice of task IDs for error messages.
+func taskIDs(tasks []*storage.Task) []string {
+	ids := make([]string, len(tasks))
+	for i, t := range tasks {
+		ids[i] = t.ID
+	}
+	return ids
 }

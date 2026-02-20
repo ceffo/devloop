@@ -309,6 +309,9 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 // getReadyTasksForExecution returns the list of tasks ready to execute based on filters
 func getReadyTasksForExecution(store storage.TaskStore, filter storage.Filter, taskID string, continueSession bool, session *Session) ([]*storage.Task, error) {
 	// On resume, reset in_progress and failed tasks to pending so they get retried.
+	// Exception: in_progress tasks that were previously decomposed by the coordinator
+	// retain their status so the coordinator is not re-invoked; their subtasks remain
+	// pending and will be discovered via QueryReadyTasks naturally.
 	if continueSession {
 		for _, status := range []string{"failed", "in_progress"} {
 			extraTasks, err := store.QueryTasks(storage.Filter{Status: status})
@@ -316,6 +319,10 @@ func getReadyTasksForExecution(store storage.TaskStore, filter storage.Filter, t
 				return nil, fmt.Errorf("failed to query %s tasks for resume: %w", status, err)
 			}
 			for _, t := range extraTasks {
+				// Skip decomposed parent tasks — subtasks handle the remaining work.
+				if len(t.DecomposedInto) > 0 {
+					continue
+				}
 				t.Status = "pending"
 				if err := store.UpdateTask(t); err != nil {
 					return nil, fmt.Errorf("failed to reset %s task %s: %w", status, t.ID, err)
@@ -646,6 +653,20 @@ func runCoordinator(ctx context.Context, cfg *config.Config, store storage.TaskS
 		if err != nil {
 			return false, nil, fmt.Errorf("failed to load coordinator output: %w", err)
 		}
+	}
+
+	// Record decomposition on the parent task so session recovery can detect it.
+	// The parent is marked in_progress with DecomposedInto set; this prevents the
+	// coordinator from being re-invoked if execution is resumed.
+	subtaskIDs := make([]string, len(subtasks))
+	for i, st := range subtasks {
+		subtaskIDs[i] = st.ID
+	}
+	task.Status = "in_progress"
+	task.DecomposedInto = subtaskIDs
+	if err := store.UpdateTask(task); err != nil {
+		// Non-fatal: decomposition succeeded; log the warning but continue.
+		notifier.Log(fmt.Sprintf("  ⚠ Warning: failed to record decomposition on parent task %s: %v", task.ID, err))
 	}
 
 	return true, subtasks, nil

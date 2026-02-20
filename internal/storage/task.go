@@ -28,6 +28,9 @@ type Task struct {
 
 	// Results (when completed)
 	Results *TaskResults `json:"results,omitempty"` // Verification output, commit hash
+
+	// Decomposition tracking
+	DecomposedInto []string `json:"decomposed_into,omitempty"` // IDs of subtasks when coordinator decomposed this task
 }
 
 // TaskMetadata tracks task creation and updates
