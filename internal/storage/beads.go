@@ -292,6 +292,21 @@ func (s *BeadsStore) QueryTasks(ctx context.Context, filter Filter) ([]*Task, er
 	return s.parseBdListOutput(out)
 }
 
+// QueryReadyTasks calls `bd ready --json`, parses the output, and merges each result
+// with its sidecar data. Returns an empty slice (not error) when no tasks are ready.
+func (s *BeadsStore) QueryReadyTasks(ctx context.Context) ([]*Task, error) {
+	readyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	cmd := execCommandContextFunc(readyCtx, s.bdPath, "ready", "--json")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("bd ready failed: %w", err)
+	}
+
+	return s.parseBdListOutput(out)
+}
+
 // UpdateTask dispatches the status transition to the appropriate bd command(s)
 // and updates the sidecar file with the latest execution and results data.
 //   - in_progress: bd update <id> --claim --json (atomic claim)

@@ -732,6 +732,113 @@ func TestQueryTasks_CompletedMapsToClosedStatus(t *testing.T) {
 	}
 }
 
+// --- QueryReadyTasks tests ---
+
+func TestQueryReadyTasks_CallsBdReady(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	var capturedArgs [][]string
+	execCommandContextFunc = mockExecCommand("echo '[]'", &capturedArgs)
+	defer func() { execCommandContextFunc = orig }()
+
+	_, err := store.QueryReadyTasks(context.Background())
+	if err != nil {
+		t.Fatalf("QueryReadyTasks failed: %v", err)
+	}
+
+	// Verify bd ready --json was called
+	if len(capturedArgs) != 1 {
+		t.Fatalf("expected 1 exec call, got %d", len(capturedArgs))
+	}
+	args := capturedArgs[0]
+	if args[0] != "/usr/local/bin/bd" {
+		t.Errorf("expected bd binary, got %q", args[0])
+	}
+	if len(args) < 3 || args[1] != "ready" || args[2] != "--json" {
+		t.Errorf("expected 'ready --json' args, got: %v", args[1:])
+	}
+}
+
+func TestQueryReadyTasks_ParsesJSONAndMergesSidecar(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	// Write a sidecar for bd-aaa1
+	if err := store.writeSidecar("bd-aaa1", &TaskSidecar{DevloopID: "DEV-1", Complexity: "simple"}); err != nil {
+		t.Fatalf("writeSidecar failed: %v", err)
+	}
+
+	readyJSON := `[{"id":"bd-aaa1","title":"Ready Task","body":"description","status":"open","labels":[],"deps":[]}]`
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("echo '"+readyJSON+"'", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	tasks, err := store.QueryReadyTasks(context.Background())
+	if err != nil {
+		t.Fatalf("QueryReadyTasks failed: %v", err)
+	}
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].ID != "bd-aaa1" {
+		t.Errorf("ID: expected %q, got %q", "bd-aaa1", tasks[0].ID)
+	}
+	if tasks[0].Complexity != "simple" {
+		t.Errorf("Complexity: expected %q, got %q", "simple", tasks[0].Complexity)
+	}
+}
+
+func TestQueryReadyTasks_EmptyWhenNoTasksReady(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("echo '[]'", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	tasks, err := store.QueryReadyTasks(context.Background())
+	if err != nil {
+		t.Fatalf("QueryReadyTasks failed: %v", err)
+	}
+
+	if len(tasks) != 0 {
+		t.Errorf("expected 0 tasks, got %d", len(tasks))
+	}
+	if tasks == nil {
+		t.Error("expected empty slice, not nil")
+	}
+}
+
+func TestQueryReadyTasks_BdReadyFails(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("exit 1", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	_, err := store.QueryReadyTasks(context.Background())
+	if err == nil {
+		t.Fatal("QueryReadyTasks should fail when bd ready fails")
+	}
+	if !contains(err.Error(), "bd ready") {
+		t.Errorf("expected 'bd ready' in error, got: %v", err)
+	}
+}
+
+func TestQueryReadyTasks_InvalidJSON(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("echo 'not json'", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	_, err := store.QueryReadyTasks(context.Background())
+	if err == nil {
+		t.Fatal("QueryReadyTasks should fail on invalid JSON")
+	}
+}
+
 // --- UpdateTask tests ---
 
 func TestUpdateTask_InProgress_ClaimsCalled(t *testing.T) {
