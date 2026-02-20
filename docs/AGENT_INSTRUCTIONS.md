@@ -178,6 +178,74 @@ var myCmd = &cobra.Command{
 - Can be distributed as standalone tool
 - Works with any tech stack
 
+## Knowledge Layer
+
+The devloop knowledge layer captures expertise and learnings from task execution to improve future work.
+
+### Querying Knowledge
+
+Query the knowledge base to learn from past task implementations:
+
+```bash
+# Query expertise for a specific domain
+devloop knowledge query mypackage
+
+# Search for a specific topic
+devloop knowledge search "authentication flow"
+
+# Show knowledge status
+devloop knowledge status
+
+# Compact the knowledge base
+devloop knowledge compact
+
+# Run diagnostics
+devloop knowledge doctor
+
+# View knowledge diff from a git ref
+devloop knowledge diff HEAD~1
+
+# Prime knowledge for specified domains
+devloop knowledge prime mypackage otherpackage
+```
+
+The knowledge backend is configured in `.devloop/config.json` under `knowledge.backend` (default: `"mulch"`).
+
+### Automatic Prompt Injection
+
+Knowledge is automatically injected into agent prompts during task execution via the `Prime()` function. This provides relevant context without explicit querying—agents receive priming data that enhances prompt awareness of related work.
+
+The priming mechanism:
+- Retrieves cached domain expertise via `devloop knowledge prime`
+- Formats results as markdown for integration into prompts
+- Returns empty string gracefully if mulch is unavailable (non-fatal)
+- Respects configured token budgets to keep prompts manageable
+
+### Recording Learnings
+
+At task completion, agents are expected to record domain knowledge and insights:
+
+```bash
+# From within task execution
+devloop knowledge query <domain>  # Review existing knowledge before recording
+mulch record <domain> <type> <content>  # Store new knowledge
+```
+
+**Expectations:**
+- Record learnings for the packages/domains modified in the task
+- Capture architectural decisions, patterns, and gotchas
+- Include examples or snippets for recurring problems
+- Document integration points or dependencies discovered
+
+**Example:**
+After implementing an authentication feature, record learnings:
+```bash
+mulch record auth implementation "JWT token validation for REST endpoints..."
+mulch record auth pattern "Use middleware for auth checks..."
+```
+
+The knowledge base is version-controlled alongside code, allowing team members to benefit from collective insights.
+
 ## Task Implementation Workflow
 
 Tasks are tracked in `docs/TASKS.md`. Work sequentially—later tasks may depend on earlier ones.
@@ -188,7 +256,8 @@ Tasks are tracked in `docs/TASKS.md`. Work sequentially—later tasks may depend
 2. Check dependencies (blocked_by field)
 3. Implement according to requirements
 4. Verify acceptance criteria
-5. Commit with: `task <ID>: <title>` (lowercase, imperative)
+5. **Record learnings** via `devloop knowledge` commands (see Knowledge Layer section)
+6. Commit with: `task <ID>: <title>` (lowercase, imperative)
 
 **Model annotations guide complexity:**
 
