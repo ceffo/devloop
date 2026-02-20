@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -171,4 +173,205 @@ func beadsStatusToDevloop(beadsStatus BeadsStatusInfo) string {
 		fmt.Printf("WARNING: unknown Beads status %q, using default 'pending'\n", beadsStatus.Status)
 		return "pending"
 	}
+}
+
+// bdCreateOutput represents the JSON output of `bd create --json`.
+type bdCreateOutput struct {
+	ID string `json:"id"`
+}
+
+// bdShowTask represents the JSON output of `bd show --json` and each element of `bd list --json`.
+type bdShowTask struct {
+	ID     string   `json:"id"`
+	Title  string   `json:"title"`
+	Body   string   `json:"body"`
+	Status string   `json:"status"`
+	Labels []string `json:"labels"`
+	Deps   []string `json:"deps"`
+}
+
+// bdShowTaskToBeadsData converts a bdShowTask to beadsTaskData with status mapped to devloop.
+func bdShowTaskToBeadsData(t *bdShowTask) beadsTaskData {
+	status := beadsStatusToDevloop(BeadsStatusInfo{Status: t.Status, Labels: t.Labels})
+	return beadsTaskData{
+		ID:          t.ID,
+		Title:       t.Title,
+		Description: t.Body,
+		Status:      status,
+	}
+}
+
+// parseBdListOutput parses the JSON array output of `bd list --json` and merges each task
+// with its sidecar file to return a slice of *Task.
+func (s *BeadsStore) parseBdListOutput(data []byte) ([]*Task, error) {
+	var bdTasks []bdShowTask
+	if err := json.Unmarshal(data, &bdTasks); err != nil {
+		return nil, fmt.Errorf("failed to parse bd list JSON: %w", err)
+	}
+
+	tasks := make([]*Task, 0, len(bdTasks))
+	for i := range bdTasks {
+		bdTask := &bdTasks[i]
+		sidecar, err := s.readSidecar(bdTask.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read sidecar for %q: %w", bdTask.ID, err)
+		}
+		task := mergeSidecar(bdShowTaskToBeadsData(bdTask), sidecar)
+		task.BlockedBy = bdTask.Deps
+		tasks = append(tasks, task)
+	}
+
+	return tasks, nil
+}
+
+// GetTask resolves the devloop ID to a Beads ID via KV lookup, fetches the task via
+// `bd show --json`, reads the sidecar, and returns the merged *Task.
+// BlockedBy is populated from the Beads deps field, not the sidecar.
+func (s *BeadsStore) GetTask(ctx context.Context, id string) (*Task, error) {
+	beadsID, err := s.resolveBeadsID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("GetTask: failed to resolve ID %q: %w", id, err)
+	}
+
+	showCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := execCommandContextFunc(showCtx, s.bdPath, "show", beadsID, "--json")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("bd show %q failed: %w", beadsID, err)
+	}
+
+	var bdTask bdShowTask
+	if err := json.Unmarshal(out, &bdTask); err != nil {
+		return nil, fmt.Errorf("failed to parse bd show JSON: %w (output: %s)", err, strings.TrimSpace(string(out)))
+	}
+
+	sidecar, err := s.readSidecar(beadsID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read sidecar for %q: %w", beadsID, err)
+	}
+
+	task := mergeSidecar(bdShowTaskToBeadsData(&bdTask), sidecar)
+	task.BlockedBy = bdTask.Deps
+	return task, nil
+}
+
+// LoadTasks returns all open tasks via `bd list --json --status open`, merging each with its sidecar.
+func (s *BeadsStore) LoadTasks(ctx context.Context) ([]*Task, error) {
+	listCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	cmd := execCommandContextFunc(listCtx, s.bdPath, "list", "--json", "--status", "open")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("bd list failed: %w", err)
+	}
+
+	return s.parseBdListOutput(out)
+}
+
+// QueryTasks applies the devloop→Beads status mapping (when filter.Status is set) and calls
+// `bd list --json [--status <mapped>]`, merging each result with its sidecar.
+func (s *BeadsStore) QueryTasks(ctx context.Context, filter Filter) ([]*Task, error) {
+	args := []string{"list", "--json"}
+	if filter.Status != "" {
+		beadsStatus := devloopStatusToBeads(filter.Status)
+		args = append(args, "--status", beadsStatus.Status)
+	}
+
+	listCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	cmd := execCommandContextFunc(listCtx, s.bdPath, args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("bd list failed: %w", err)
+	}
+
+	return s.parseBdListOutput(out)
+}
+
+// SaveTask implements the six-step creation flow:
+//  1. Write task.Description to a temp file
+//  2. Call `bd create <title> --body-file <tempfile> --json`
+//  3. Parse the returned JSON to capture the Beads hash ID
+//  4. Write bidirectional KV mapping (devloop:<ID> ↔ beads:<beadsID>)
+//  5. Write sidecar file with devloop-specific metadata
+//  6. Link dependencies via `bd dep add` for each BlockedBy entry
+//  7. Remove the temp file
+func (s *BeadsStore) SaveTask(ctx context.Context, task *Task) error {
+	// Step 1: write description to temp file
+	tmpFile, err := os.CreateTemp("", "devloop-task-*.md")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	// Ensure cleanup regardless of outcome
+	defer os.Remove(tmpPath)
+
+	if _, err := tmpFile.WriteString(task.Description); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write description to temp file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	// Step 2: call bd create --body-file <path> --json
+	createCtx, cancelCreate := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelCreate()
+
+	cmd := execCommandContextFunc(createCtx, s.bdPath, "create", task.Title, "--body-file", tmpPath, "--json")
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("bd create failed: %w", err)
+	}
+
+	// Step 3: parse hash ID from JSON output
+	var result bdCreateOutput
+	if err := json.Unmarshal(out, &result); err != nil {
+		return fmt.Errorf("failed to parse bd create JSON output: %w (output: %s)", err, strings.TrimSpace(string(out)))
+	}
+	beadsID := result.ID
+	if beadsID == "" {
+		return fmt.Errorf("bd create returned empty ID (output: %s)", strings.TrimSpace(string(out)))
+	}
+
+	// Step 4: write bidirectional KV mapping
+	if err := s.writeIDMapping(ctx, task.ID, beadsID); err != nil {
+		return fmt.Errorf("failed to write ID mapping: %w", err)
+	}
+
+	// Step 5: write sidecar file
+	sidecar := &TaskSidecar{
+		DevloopID:          task.ID,
+		Complexity:         task.Complexity,
+		AcceptanceCriteria: task.AcceptanceCriteria,
+		Tags:               task.Tags,
+		MaxAttempts:        task.Metadata.MaxAttempts,
+		Execution:          task.Execution,
+		Results:            task.Results,
+	}
+	if err := s.writeSidecar(beadsID, sidecar); err != nil {
+		return fmt.Errorf("failed to write sidecar: %w", err)
+	}
+
+	// Step 6: link dependencies
+	for _, depID := range task.BlockedBy {
+		resolvedDep, err := s.resolveBeadsID(ctx, depID)
+		if err != nil {
+			return fmt.Errorf("failed to resolve dependency %q: %w", depID, err)
+		}
+
+		depCtx, cancelDep := context.WithTimeout(ctx, 10*time.Second)
+		depCmd := execCommandContextFunc(depCtx, s.bdPath, "dep", "add", beadsID, resolvedDep)
+		depOut, depErr := depCmd.CombinedOutput()
+		cancelDep()
+		if depErr != nil {
+			return fmt.Errorf("bd dep add %q → %q failed: %w (output: %s)", beadsID, resolvedDep, depErr, strings.TrimSpace(string(depOut)))
+		}
+	}
+
+	return nil
 }

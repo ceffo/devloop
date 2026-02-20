@@ -465,3 +465,281 @@ func stringSlicesEqual(a, b []string) bool {
 	}
 	return true
 }
+
+// --- GetTask tests ---
+
+func TestGetTask_ParsesJSONAndMergesSidecar(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	// Write a sidecar for the beads task
+	sidecar := &TaskSidecar{
+		DevloopID:  "DEV-5",
+		Complexity: "moderate",
+		Tags:       []string{"backend"},
+		MaxAttempts: 3,
+	}
+	if err := store.writeSidecar("bd-x7f3", sidecar); err != nil {
+		t.Fatalf("writeSidecar failed: %v", err)
+	}
+
+	bdJSON := `{"id":"bd-x7f3","title":"My Task","body":"Do the thing","status":"open","labels":[],"deps":["bd-abc1"]}`
+
+	orig := execCommandContextFunc
+	callCount := 0
+	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		callCount++
+		switch callCount {
+		case 1:
+			// bd kv get devloop:DEV-5
+			return exec.CommandContext(ctx, "sh", "-c", "echo bd-x7f3")
+		case 2:
+			// bd show bd-x7f3 --json
+			return exec.CommandContext(ctx, "sh", "-c", "echo '"+bdJSON+"'")
+		}
+		t.Errorf("unexpected call %d", callCount)
+		return exec.CommandContext(ctx, "sh", "-c", "exit 1")
+	}
+	defer func() { execCommandContextFunc = orig }()
+
+	task, err := store.GetTask(context.Background(), "DEV-5")
+	if err != nil {
+		t.Fatalf("GetTask failed: %v", err)
+	}
+
+	if task.ID != "bd-x7f3" {
+		t.Errorf("ID: expected %q, got %q", "bd-x7f3", task.ID)
+	}
+	if task.Title != "My Task" {
+		t.Errorf("Title: expected %q, got %q", "My Task", task.Title)
+	}
+	if task.Description != "Do the thing" {
+		t.Errorf("Description: expected %q, got %q", "Do the thing", task.Description)
+	}
+	if task.Status != "pending" {
+		t.Errorf("Status: expected %q, got %q", "pending", task.Status)
+	}
+	if task.Complexity != "moderate" {
+		t.Errorf("Complexity: expected %q, got %q", "moderate", task.Complexity)
+	}
+	if !stringSlicesEqual(task.Tags, []string{"backend"}) {
+		t.Errorf("Tags: expected [backend], got %v", task.Tags)
+	}
+	if task.Metadata.MaxAttempts != 3 {
+		t.Errorf("MaxAttempts: expected 3, got %d", task.Metadata.MaxAttempts)
+	}
+	// BlockedBy comes from bd show deps, not sidecar
+	if !stringSlicesEqual(task.BlockedBy, []string{"bd-abc1"}) {
+		t.Errorf("BlockedBy: expected [bd-abc1], got %v", task.BlockedBy)
+	}
+}
+
+func TestGetTask_PopulatesBlockedByFromBdShow(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	bdJSON := `{"id":"bd-x7f3","title":"Task","body":"desc","status":"blocked","labels":[],"deps":["bd-dep1","bd-dep2"]}`
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("echo '"+bdJSON+"'", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	// Already a Beads ID, so no KV lookup
+	task, err := store.GetTask(context.Background(), "bd-x7f3")
+	if err != nil {
+		t.Fatalf("GetTask failed: %v", err)
+	}
+
+	if len(task.BlockedBy) != 2 || task.BlockedBy[0] != "bd-dep1" || task.BlockedBy[1] != "bd-dep2" {
+		t.Errorf("BlockedBy: expected [bd-dep1 bd-dep2], got %v", task.BlockedBy)
+	}
+}
+
+func TestGetTask_BdShowFails(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("exit 1", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	_, err := store.GetTask(context.Background(), "bd-x7f3")
+	if err == nil {
+		t.Fatal("GetTask should fail when bd show fails")
+	}
+}
+
+func TestGetTask_InvalidJSON(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("echo 'not json'", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	_, err := store.GetTask(context.Background(), "bd-x7f3")
+	if err == nil {
+		t.Fatal("GetTask should fail on invalid JSON")
+	}
+}
+
+// --- LoadTasks tests ---
+
+func TestLoadTasks_ParsesJSONList(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	listJSON := `[{"id":"bd-aaa1","title":"Task A","body":"body a","status":"open","labels":[],"deps":[]},{"id":"bd-bbb2","title":"Task B","body":"body b","status":"in_progress","labels":[],"deps":["bd-aaa1"]}]`
+
+	orig := execCommandContextFunc
+	var capturedArgs [][]string
+	execCommandContextFunc = mockExecCommand("echo '"+listJSON+"'", &capturedArgs)
+	defer func() { execCommandContextFunc = orig }()
+
+	tasks, err := store.LoadTasks(context.Background())
+	if err != nil {
+		t.Fatalf("LoadTasks failed: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+	if tasks[0].ID != "bd-aaa1" {
+		t.Errorf("tasks[0].ID: expected %q, got %q", "bd-aaa1", tasks[0].ID)
+	}
+	if tasks[0].Status != "pending" {
+		t.Errorf("tasks[0].Status: expected %q, got %q", "pending", tasks[0].Status)
+	}
+	if tasks[1].ID != "bd-bbb2" {
+		t.Errorf("tasks[1].ID: expected %q, got %q", "bd-bbb2", tasks[1].ID)
+	}
+	if tasks[1].Status != "in_progress" {
+		t.Errorf("tasks[1].Status: expected %q, got %q", "in_progress", tasks[1].Status)
+	}
+	if !stringSlicesEqual(tasks[1].BlockedBy, []string{"bd-aaa1"}) {
+		t.Errorf("tasks[1].BlockedBy: expected [bd-aaa1], got %v", tasks[1].BlockedBy)
+	}
+
+	// Verify --status open was passed
+	if len(capturedArgs) != 1 {
+		t.Fatalf("expected 1 exec call, got %d", len(capturedArgs))
+	}
+	args := capturedArgs[0]
+	if !contains(joinArgs(args), "--status open") {
+		t.Errorf("expected --status open in args: %v", args)
+	}
+}
+
+func TestLoadTasks_EmptyList(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("echo '[]'", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	tasks, err := store.LoadTasks(context.Background())
+	if err != nil {
+		t.Fatalf("LoadTasks failed: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Errorf("expected 0 tasks, got %d", len(tasks))
+	}
+}
+
+func TestLoadTasks_MergesSidecar(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	// Write a sidecar for bd-aaa1
+	if err := store.writeSidecar("bd-aaa1", &TaskSidecar{DevloopID: "DEV-1", Complexity: "simple"}); err != nil {
+		t.Fatalf("writeSidecar failed: %v", err)
+	}
+
+	listJSON := `[{"id":"bd-aaa1","title":"Task A","body":"body","status":"open","labels":[],"deps":[]}]`
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = mockExecCommand("echo '"+listJSON+"'", nil)
+	defer func() { execCommandContextFunc = orig }()
+
+	tasks, err := store.LoadTasks(context.Background())
+	if err != nil {
+		t.Fatalf("LoadTasks failed: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].Complexity != "simple" {
+		t.Errorf("Complexity: expected %q, got %q", "simple", tasks[0].Complexity)
+	}
+}
+
+// --- QueryTasks tests ---
+
+func TestQueryTasks_MapsStatusFilter(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	var capturedArgs [][]string
+	execCommandContextFunc = mockExecCommand("echo '[]'", &capturedArgs)
+	defer func() { execCommandContextFunc = orig }()
+
+	_, err := store.QueryTasks(context.Background(), Filter{Status: "pending"})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(capturedArgs) != 1 {
+		t.Fatalf("expected 1 exec call, got %d", len(capturedArgs))
+	}
+	// pending → open
+	if !contains(joinArgs(capturedArgs[0]), "--status open") {
+		t.Errorf("expected --status open for pending filter, got: %v", capturedArgs[0])
+	}
+}
+
+func TestQueryTasks_NoStatusFilter(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	var capturedArgs [][]string
+	execCommandContextFunc = mockExecCommand("echo '[]'", &capturedArgs)
+	defer func() { execCommandContextFunc = orig }()
+
+	_, err := store.QueryTasks(context.Background(), Filter{})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	if len(capturedArgs) != 1 {
+		t.Fatalf("expected 1 exec call, got %d", len(capturedArgs))
+	}
+	// No --status flag when filter is empty
+	if contains(joinArgs(capturedArgs[0]), "--status") {
+		t.Errorf("expected no --status flag for empty filter, got: %v", capturedArgs[0])
+	}
+}
+
+func TestQueryTasks_CompletedMapsToClosedStatus(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	var capturedArgs [][]string
+	execCommandContextFunc = mockExecCommand("echo '[]'", &capturedArgs)
+	defer func() { execCommandContextFunc = orig }()
+
+	_, err := store.QueryTasks(context.Background(), Filter{Status: "completed"})
+	if err != nil {
+		t.Fatalf("QueryTasks failed: %v", err)
+	}
+
+	// completed → closed
+	if !contains(joinArgs(capturedArgs[0]), "--status closed") {
+		t.Errorf("expected --status closed for completed filter, got: %v", capturedArgs[0])
+	}
+}
+
+// joinArgs concatenates args with spaces for simple substring checking
+func joinArgs(args []string) string {
+	result := ""
+	for i, a := range args {
+		if i > 0 {
+			result += " "
+		}
+		result += a
+	}
+	return result
+}

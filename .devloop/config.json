@@ -25,7 +25,7 @@
       "copilot": {
         "tool": "copilot",
         "models": {
-          "complex": "claude-opus-4.6",
+          "complex": "claude-sonnet-4.6",
           "moderate": "claude-sonnet-4.6",
           "simple": "claude-haiku-4.5"
         }
