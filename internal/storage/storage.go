@@ -11,35 +11,46 @@ import (
 	"github.com/ceffo/devloop/internal/config"
 )
 
-// Storage handles JSONL read/write operations for tasks
-type Storage struct {
+// Compile-time check that JSONLStore implements TaskStore
+var _ TaskStore = (*JSONLStore)(nil)
+
+// JSONLStore handles JSONL read/write operations for tasks
+type JSONLStore struct {
 	cfg      *config.Config
 	tasksDir string
 }
 
-// NewStorage creates a new Storage instance
-func NewStorage(cfg *config.Config) *Storage {
+// Storage is a backward-compatible alias for JSONLStore
+type Storage = JSONLStore
+
+// NewJSONLStore creates a new JSONLStore instance
+func NewJSONLStore(cfg *config.Config) *JSONLStore {
 	// Construct the tasks directory path: <project_path>/.devloop
 	tasksDir := filepath.Join(cfg.Project.Path, ".devloop")
 
-	return &Storage{
+	return &JSONLStore{
 		cfg:      cfg,
 		tasksDir: tasksDir,
 	}
 }
 
+// NewStorage creates a new JSONLStore instance (alias for NewJSONLStore)
+func NewStorage(cfg *config.Config) *JSONLStore {
+	return NewJSONLStore(cfg)
+}
+
 // getTasksFilePath returns the full path to the tasks.jsonl file
-func (s *Storage) getTasksFilePath() string {
+func (s *JSONLStore) getTasksFilePath() string {
 	return filepath.Join(s.tasksDir, "tasks.jsonl")
 }
 
 // ConfigPath returns the full path to the config.json file
-func (s *Storage) ConfigPath() string {
+func (s *JSONLStore) ConfigPath() string {
 	return filepath.Join(s.tasksDir, "config.json")
 }
 
 // LoadTasks reads all tasks from the JSONL file
-func (s *Storage) LoadTasks() ([]*Task, error) {
+func (s *JSONLStore) LoadTasks() ([]*Task, error) {
 	path := s.getTasksFilePath()
 
 	// Check if file exists
@@ -87,7 +98,7 @@ func (s *Storage) LoadTasks() ([]*Task, error) {
 }
 
 // SaveTask appends a new task to the JSONL file
-func (s *Storage) SaveTask(task *Task) error {
+func (s *JSONLStore) SaveTask(task *Task) error {
 	path := s.getTasksFilePath()
 
 	// Create parent directory if missing
@@ -112,7 +123,7 @@ func (s *Storage) SaveTask(task *Task) error {
 }
 
 // UpdateTask updates an existing task by rewriting the entire file
-func (s *Storage) UpdateTask(task *Task) error {
+func (s *JSONLStore) UpdateTask(task *Task) error {
 	// Load all tasks
 	tasks, err := s.LoadTasks()
 	if err != nil {
@@ -169,7 +180,7 @@ func (s *Storage) UpdateTask(task *Task) error {
 }
 
 // GetTask finds and returns a task by ID
-func (s *Storage) GetTask(id string) (*Task, error) {
+func (s *JSONLStore) GetTask(id string) (*Task, error) {
 	// Load all tasks
 	tasks, err := s.LoadTasks()
 	if err != nil {
@@ -187,7 +198,7 @@ func (s *Storage) GetTask(id string) (*Task, error) {
 }
 
 // QueryTasks filters tasks based on the provided filter criteria and returns them sorted by ID
-func (s *Storage) QueryTasks(filter Filter) ([]*Task, error) {
+func (s *JSONLStore) QueryTasks(filter Filter) ([]*Task, error) {
 	// Load all tasks
 	tasks, err := s.LoadTasks()
 	if err != nil {
@@ -212,7 +223,7 @@ func (s *Storage) QueryTasks(filter Filter) ([]*Task, error) {
 
 // QueryReadyTasks returns all tasks that are ready to execute
 // (pending status and not blocked by dependencies), sorted by ID
-func (s *Storage) QueryReadyTasks() ([]*Task, error) {
+func (s *JSONLStore) QueryReadyTasks() ([]*Task, error) {
 	// Load all tasks
 	tasks, err := s.LoadTasks()
 	if err != nil {
