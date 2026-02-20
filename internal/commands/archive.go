@@ -81,7 +81,13 @@ RunE: func(cmd *cobra.Command, _ []string) error {
 			fmt.Printf("  JSONL Output:    %s\n", result.OutputPath)
 			fmt.Printf("  Markdown Output: %s\n\n", mdPath)
 
-			// Sync storage if backend supports it; failures are non-fatal warnings.
+			// For Beads backend: run compact for memory decay, then sync.
+			// For all backends: sync if supported. Failures are non-fatal warnings.
+			if compactor, ok := store.(storage.Compactor); ok {
+				if err := compactor.Compact(); err != nil {
+					fmt.Printf("Warning: compact failed: %v\n", err)
+				}
+			}
 			if syncer, ok := store.(storage.Syncer); ok {
 				if err := syncer.Sync(); err != nil {
 					fmt.Printf("Warning: sync failed: %v\n", err)

@@ -1,8 +1,10 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -730,21 +732,54 @@ func TestNewTaskStore_BeadsBackend(t *testing.T) {
 	cfg, _ := createTestConfig(t)
 	cfg.Storage.Backend = "beads"
 
+	// Mock lookPathFunc so we can test both success and failure paths.
+	originalLookPath := lookPathFunc
+	lookPathFunc = func(file string) (string, error) {
+		return "/usr/local/bin/bd", nil
+	}
+	defer func() { lookPathFunc = originalLookPath }()
+
 	store, err := NewTaskStore(cfg)
 
-	// Should return an error
+	// Should succeed when bd binary is available
+	if err != nil {
+		t.Fatalf("NewTaskStore with 'beads' backend should succeed when bd is available: %v", err)
+	}
+	if store == nil {
+		t.Fatal("NewTaskStore should return a non-nil store for beads backend")
+	}
+
+	// Should implement Syncer
+	if _, ok := store.(Syncer); !ok {
+		t.Error("beads TaskStore should implement Syncer")
+	}
+
+	// Should implement Compactor
+	if _, ok := store.(Compactor); !ok {
+		t.Error("beads TaskStore should implement Compactor")
+	}
+}
+
+func TestNewTaskStore_BeadsBackend_BdNotFound(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	cfg.Storage.Backend = "beads"
+
+	originalLookPath := lookPathFunc
+	lookPathFunc = func(file string) (string, error) {
+		return "", fmt.Errorf("executable file not found in $PATH")
+	}
+	defer func() { lookPathFunc = originalLookPath }()
+
+	store, err := NewTaskStore(cfg)
+
 	if err == nil {
-		t.Fatal("NewTaskStore with 'beads' backend should return an error")
+		t.Fatal("NewTaskStore with 'beads' backend should return an error when bd is not found")
 	}
-
-	// Should return nil store
 	if store != nil {
-		t.Errorf("NewTaskStore should return nil store for beads backend, got %v", store)
+		t.Errorf("NewTaskStore should return nil store when bd is not found, got %v", store)
 	}
-
-	// Verify error message mentions "not yet implemented"
-	if err.Error() != "beads backend is not yet implemented" {
-		t.Errorf("Expected error message 'beads backend is not yet implemented', got %q", err.Error())
+	if !strings.Contains(err.Error(), "beads") {
+		t.Errorf("Expected error message to mention 'beads', got %q", err.Error())
 	}
 }
 

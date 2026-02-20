@@ -377,6 +377,20 @@ func (s *BeadsStore) UpdateTask(ctx context.Context, task *Task) error {
 	return nil
 }
 
+// Compact calls `bd admin compact --auto --all --tier 1` for memory decay.
+// It is not part of the TaskStore interface; callers use a type assertion.
+func (s *BeadsStore) Compact() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	cmd := execCommandContextFunc(ctx, s.bdPath, "admin", "compact", "--auto", "--all", "--tier", "1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("bd admin compact failed: %w (output: %s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 // Sync calls `bd sync` to synchronize the Beads store with the remote.
 // It is not part of the TaskStore interface; callers use a type assertion.
 // Sync failures should be treated as warnings, not fatal errors.
