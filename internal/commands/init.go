@@ -63,13 +63,14 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	reader := bufio.NewReader(os.Stdin)
+
 	// Check if .devloop/ already exists
 	if _, err := os.Stat(devloopDir); err == nil {
 		// Directory exists, prompt user
 		fmt.Printf("⚠  .devloop/ directory already exists in %s\n", cwd)
 		fmt.Print("Do you want to overwrite it? [y/N]: ")
 
-		reader := bufio.NewReader(os.Stdin)
 		response, err := reader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("failed to read user input: %w", err)
@@ -82,6 +83,12 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	// Prompt for extended setup before starting the spinner
+	extSetup, err := promptExtendedSetup(reader)
+	if err != nil {
+		return fmt.Errorf("failed to read extended setup options: %w", err)
+	}
+
 	// Initialize project with spinner
 	spinner := ui.NewSpinner("Initializing project...")
 	spinner.Start()
@@ -92,8 +99,9 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	// Generate config with detected values
+	// Generate config with detected values and apply extended setup choices
 	cfg := createInitialConfig(projectName, cwd, techStack)
+	applyExtendedSetup(cfg, extSetup)
 
 	// Save config
 	if err := config.SaveConfig(configPath, cfg); err != nil {
@@ -250,6 +258,98 @@ func createInitialConfig(name, path, techStack string) *config.Config {
 	}
 
 	return cfg
+}
+
+// extendedSetupOptions holds the user's choices from the extended setup wizard.
+type extendedSetupOptions struct {
+	StorageBackend    string   // "jsonl" or "beads"
+	KnowledgeBackend  string   // "none" or "mulch"
+	Domains           []string // knowledge domains for mulch backend
+	EnableCoordinator bool
+}
+
+// promptExtendedSetup asks the user whether they want extended setup and, if so,
+// prompts for task store backend, knowledge layer, and coordinator configuration.
+// Returns nil when the user skips extended setup (backward-compatible defaults apply).
+func promptExtendedSetup(reader *bufio.Reader) (*extendedSetupOptions, error) {
+	fmt.Print("Configure extended setup? [y/N]: ")
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read input: %w", err)
+	}
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response != "y" && response != "yes" {
+		return nil, nil
+	}
+
+	opts := &extendedSetupOptions{
+		StorageBackend:   "jsonl",
+		KnowledgeBackend: "none",
+	}
+
+	// Task store backend
+	fmt.Print("Task store backend [jsonl/beads] (default: jsonl): ")
+	backend, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read input: %w", err)
+	}
+	if strings.TrimSpace(strings.ToLower(backend)) == "beads" {
+		opts.StorageBackend = "beads"
+	}
+
+	// Knowledge layer
+	fmt.Print("Knowledge layer [none/mulch] (default: none): ")
+	knowledge, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read input: %w", err)
+	}
+	if strings.TrimSpace(strings.ToLower(knowledge)) == "mulch" {
+		opts.KnowledgeBackend = "mulch"
+		fmt.Print("Knowledge domains (comma-separated, e.g. 'go,testing', or empty to skip): ")
+		domainsStr, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, fmt.Errorf("failed to read input: %w", err)
+		}
+		domainsStr = strings.TrimSpace(domainsStr)
+		if domainsStr != "" {
+			for _, d := range strings.Split(domainsStr, ",") {
+				if d = strings.TrimSpace(d); d != "" {
+					opts.Domains = append(opts.Domains, d)
+				}
+			}
+		}
+	}
+
+	// Coordinator
+	fmt.Print("Enable coordinator agent? [y/N]: ")
+	coord, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read input: %w", err)
+	}
+	coord = strings.TrimSpace(strings.ToLower(coord))
+	opts.EnableCoordinator = coord == "y" || coord == "yes"
+
+	return opts, nil
+}
+
+// applyExtendedSetup writes the wizard's choices into the config.
+// When opts is nil (user skipped extended setup) the config is left unchanged,
+// preserving backward-compatible defaults.
+func applyExtendedSetup(cfg *config.Config, opts *extendedSetupOptions) {
+	if opts == nil {
+		return
+	}
+	cfg.Storage.Backend = opts.StorageBackend
+	cfg.Knowledge.Backend = opts.KnowledgeBackend
+	cfg.Knowledge.Domains = opts.Domains
+	if opts.KnowledgeBackend != "none" {
+		cfg.Knowledge.InjectOnExecute = true
+		cfg.Knowledge.RecordOnComplete = true
+		if cfg.Knowledge.PrimeBudget == 0 {
+			cfg.Knowledge.PrimeBudget = 2000
+		}
+	}
+	cfg.Execution.Coordinator.Enabled = opts.EnableCoordinator
 }
 
 // mulchProvider maps a devloop agent tool name to a Mulch provider name.

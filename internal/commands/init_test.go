@@ -1,8 +1,10 @@
 package commands
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -285,6 +287,148 @@ func TestMulchProvider(t *testing.T) {
 		if ok != tt.ok || p != tt.provider {
 			t.Errorf("mulchProvider(%q) = (%q, %v), want (%q, %v)", tt.tool, p, ok, tt.provider, tt.ok)
 		}
+	}
+}
+
+func TestPromptExtendedSetupSkip(t *testing.T) {
+	for _, input := range []string{"n\n", "N\n", "\n", "no\n"} {
+		reader := bufio.NewReader(strings.NewReader(input))
+		opts, err := promptExtendedSetup(reader)
+		if err != nil {
+			t.Fatalf("input %q: unexpected error: %v", input, err)
+		}
+		if opts != nil {
+			t.Errorf("input %q: expected nil opts, got %+v", input, opts)
+		}
+	}
+}
+
+func TestPromptExtendedSetupDefaults(t *testing.T) {
+	// y → enter (keep jsonl) → enter (keep none) → enter (no coordinator)
+	reader := bufio.NewReader(strings.NewReader("y\n\n\n\n"))
+	opts, err := promptExtendedSetup(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts == nil {
+		t.Fatal("expected non-nil opts")
+	}
+	if opts.StorageBackend != "jsonl" {
+		t.Errorf("StorageBackend = %q, want %q", opts.StorageBackend, "jsonl")
+	}
+	if opts.KnowledgeBackend != "none" {
+		t.Errorf("KnowledgeBackend = %q, want %q", opts.KnowledgeBackend, "none")
+	}
+	if opts.EnableCoordinator {
+		t.Error("expected EnableCoordinator to be false")
+	}
+	if len(opts.Domains) != 0 {
+		t.Errorf("Domains = %v, want empty", opts.Domains)
+	}
+}
+
+func TestPromptExtendedSetupBeads(t *testing.T) {
+	// y → beads → none → y (enable coordinator)
+	reader := bufio.NewReader(strings.NewReader("y\nbeads\nnone\ny\n"))
+	opts, err := promptExtendedSetup(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts.StorageBackend != "beads" {
+		t.Errorf("StorageBackend = %q, want %q", opts.StorageBackend, "beads")
+	}
+	if opts.KnowledgeBackend != "none" {
+		t.Errorf("KnowledgeBackend = %q, want %q", opts.KnowledgeBackend, "none")
+	}
+	if !opts.EnableCoordinator {
+		t.Error("expected EnableCoordinator to be true")
+	}
+}
+
+func TestPromptExtendedSetupMulch(t *testing.T) {
+	// y → jsonl → mulch → go,testing → n (no coordinator)
+	reader := bufio.NewReader(strings.NewReader("y\njsonl\nmulch\ngo,testing\nn\n"))
+	opts, err := promptExtendedSetup(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts.KnowledgeBackend != "mulch" {
+		t.Errorf("KnowledgeBackend = %q, want %q", opts.KnowledgeBackend, "mulch")
+	}
+	if len(opts.Domains) != 2 || opts.Domains[0] != "go" || opts.Domains[1] != "testing" {
+		t.Errorf("Domains = %v, want [go testing]", opts.Domains)
+	}
+	if opts.EnableCoordinator {
+		t.Error("expected EnableCoordinator to be false")
+	}
+}
+
+func TestPromptExtendedSetupMulchNoDomains(t *testing.T) {
+	// y → jsonl → mulch → (empty domains) → n
+	reader := bufio.NewReader(strings.NewReader("y\njsonl\nmulch\n\nn\n"))
+	opts, err := promptExtendedSetup(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts.KnowledgeBackend != "mulch" {
+		t.Errorf("KnowledgeBackend = %q, want %q", opts.KnowledgeBackend, "mulch")
+	}
+	if len(opts.Domains) != 0 {
+		t.Errorf("Domains = %v, want empty", opts.Domains)
+	}
+}
+
+func TestApplyExtendedSetupNil(t *testing.T) {
+	cfg := createInitialConfig("test", "/test", "Go")
+	// Should be a no-op
+	applyExtendedSetup(cfg, nil)
+	// Existing agents should remain unchanged
+	if len(cfg.CLI.Agents) == 0 {
+		t.Error("CLI.Agents should not be empty after nil apply")
+	}
+}
+
+func TestApplyExtendedSetupBeadsCoordinator(t *testing.T) {
+	cfg := createInitialConfig("test", "/test", "Go")
+	opts := &extendedSetupOptions{
+		StorageBackend:    "beads",
+		KnowledgeBackend:  "none",
+		EnableCoordinator: true,
+	}
+	applyExtendedSetup(cfg, opts)
+	if cfg.Storage.Backend != "beads" {
+		t.Errorf("Storage.Backend = %q, want %q", cfg.Storage.Backend, "beads")
+	}
+	if cfg.Knowledge.Backend != "none" {
+		t.Errorf("Knowledge.Backend = %q, want %q", cfg.Knowledge.Backend, "none")
+	}
+	if !cfg.Execution.Coordinator.Enabled {
+		t.Error("expected Coordinator.Enabled to be true")
+	}
+}
+
+func TestApplyExtendedSetupMulchDomains(t *testing.T) {
+	cfg := createInitialConfig("test", "/test", "Go")
+	opts := &extendedSetupOptions{
+		StorageBackend:   "jsonl",
+		KnowledgeBackend: "mulch",
+		Domains:          []string{"go", "testing"},
+	}
+	applyExtendedSetup(cfg, opts)
+	if cfg.Knowledge.Backend != "mulch" {
+		t.Errorf("Knowledge.Backend = %q, want %q", cfg.Knowledge.Backend, "mulch")
+	}
+	if len(cfg.Knowledge.Domains) != 2 {
+		t.Errorf("Knowledge.Domains = %v, want [go testing]", cfg.Knowledge.Domains)
+	}
+	if !cfg.Knowledge.InjectOnExecute {
+		t.Error("expected Knowledge.InjectOnExecute to be true")
+	}
+	if !cfg.Knowledge.RecordOnComplete {
+		t.Error("expected Knowledge.RecordOnComplete to be true")
+	}
+	if cfg.Knowledge.PrimeBudget != 2000 {
+		t.Errorf("Knowledge.PrimeBudget = %d, want 2000", cfg.Knowledge.PrimeBudget)
 	}
 }
 
