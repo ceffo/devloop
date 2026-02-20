@@ -113,7 +113,10 @@ func ProcessPRD(cfg *config.Config, filePath string, agentName string) ([]*stora
 		return nil, err
 	}
 
-	store := storage.NewStorage(cfg)
+	store, err := storage.NewTaskStore(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize storage: %w", err)
+	}
 	nextID, err := generateNextTaskID(store, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate next task ID: %w", err)

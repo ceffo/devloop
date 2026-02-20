@@ -96,7 +96,10 @@ Examples:
 				return nil
 			}
 
-			store := storage.NewStorage(cfg)
+			store, err := storage.NewTaskStore(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to initialize storage: %w", err)
+			}
 			savedCount := 0
 			for _, task := range tasks {
 				if err := store.SaveTask(task); err != nil {
@@ -166,7 +169,10 @@ Examples:
 				return nil
 			}
 
-			store := storage.NewStorage(cfg)
+			store, err := storage.NewTaskStore(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to initialize storage: %w", err)
+			}
 			savedCount := 0
 			for _, task := range tasks {
 				if err := store.SaveTask(task); err != nil {
@@ -231,7 +237,10 @@ Examples:
 				return nil
 			}
 
-			store := storage.NewStorage(cfg)
+			store, err := storage.NewTaskStore(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to initialize storage: %w", err)
+			}
 			savedCount := 0
 			for _, task := range tasks {
 				if err := store.SaveTask(task); err != nil {

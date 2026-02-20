@@ -76,7 +76,10 @@ Examples:
 			}
 
 			// Create storage
-			store := storage.NewStorage(cfg)
+			store, err := storage.NewTaskStore(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to initialize storage: %w", err)
+			}
 
 			// Build filter
 			filter := storage.Filter{
@@ -297,7 +300,10 @@ Example:
 			}
 
 			// Create storage
-			store := storage.NewStorage(cfg)
+			store, err := storage.NewTaskStore(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to initialize storage: %w", err)
+			}
 
 			// Get task
 			task, err := store.GetTask(taskID)
@@ -510,7 +516,10 @@ Example:
 			}
 
 			// Create storage
-			store := storage.NewStorage(cfg)
+			store, err := storage.NewTaskStore(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to initialize storage: %w", err)
+			}
 
 			// Get task
 			task, err := store.GetTask(taskID)

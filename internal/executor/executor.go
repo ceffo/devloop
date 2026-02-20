@@ -32,7 +32,10 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 	defer cancel()
 
 	// Initialize storage
-	store := storage.NewStorage(cfg)
+	store, err := storage.NewTaskStore(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize storage: %w", err)
+	}
 
 	// Load or create session
 	session := LoadSession(cfg)
@@ -58,13 +61,8 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 		fmt.Printf("🚀 Starting dev loop execution (Session: %s)\n\n", session.ID[:8])
 	}
 
-	// Build filter for task query - get all pending tasks
-	filter := storage.Filter{
-		Status: "pending",
-	}
-
 	// Build initial task list
-	tasks, err := getReadyTasksForExecution(store, filter, taskID, continueSession, session)
+	tasks, err := getReadyTasksForExecution(store, storage.Filter{}, taskID, continueSession, session)
 	if err != nil {
 		return err
 	}
@@ -215,7 +213,7 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 			session.TasksCompleted = append(session.TasksCompleted, task.ID)
 
 			// After successful completion, check for newly-unblocked tasks
-			newlyReadyTasks, err := getReadyTasksForExecution(store, filter, taskID, false, session)
+			newlyReadyTasks, err := getReadyTasksForExecution(store, storage.Filter{}, taskID, false, session)
 			if err != nil {
 				notifier.Log(fmt.Sprintf("Warning: failed to check for newly ready tasks: %v", err))
 			} else {
@@ -272,39 +270,27 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 }
 
 // getReadyTasksForExecution returns the list of tasks ready to execute based on filters
-func getReadyTasksForExecution(store *storage.Storage, filter storage.Filter, taskID string, continueSession bool, session *Session) ([]*storage.Task, error) {
-	// Query all pending tasks
-	allPendingTasks, err := store.QueryTasks(filter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query tasks: %w", err)
-	}
-
-	// On resume, also include failed and in_progress tasks so they get retried.
-	// In_progress tasks are reset to pending first (they were interrupted mid-run).
+func getReadyTasksForExecution(store storage.TaskStore, filter storage.Filter, taskID string, continueSession bool, session *Session) ([]*storage.Task, error) {
+	// On resume, reset in_progress and failed tasks to pending so they get retried.
 	if continueSession {
-		resumeFilter := filter
 		for _, status := range []string{"failed", "in_progress"} {
-			resumeFilter.Status = status
-			extraTasks, err := store.QueryTasks(resumeFilter)
+			extraTasks, err := store.QueryTasks(storage.Filter{Status: status})
 			if err != nil {
 				return nil, fmt.Errorf("failed to query %s tasks for resume: %w", status, err)
 			}
-			if status == "in_progress" {
-				for _, t := range extraTasks {
-					t.Status = "pending"
-					if err := store.UpdateTask(t); err != nil {
-						return nil, fmt.Errorf("failed to reset in_progress task %s: %w", t.ID, err)
-					}
+			for _, t := range extraTasks {
+				t.Status = "pending"
+				if err := store.UpdateTask(t); err != nil {
+					return nil, fmt.Errorf("failed to reset %s task %s: %w", status, t.ID, err)
 				}
 			}
-			allPendingTasks = append(allPendingTasks, extraTasks...)
 		}
 	}
 
-	// Filter to only tasks whose dependencies are completed
-	tasks, err := filterReadyTasks(store, allPendingTasks)
+	// Get all ready tasks (pending and unblocked)
+	tasks, err := store.QueryReadyTasks()
 	if err != nil {
-		return nil, fmt.Errorf("failed to filter ready tasks: %w", err)
+		return nil, fmt.Errorf("failed to query ready tasks: %w", err)
 	}
 
 	// Filter specific task if requested
@@ -332,7 +318,7 @@ func getReadyTasksForExecution(store *storage.Storage, filter storage.Filter, ta
 // executeTask executes a single task with retry logic
 // Returns (success, error)
 // sessionStats is updated in place and UsageStatsUpdate is called after each agent call.
-func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.Runner, task *storage.Task, model string, notifier Notifier, sessionStats *ui.UsageStats, knowledgeClient knowledge.Client) (bool, error) {
+func executeTask(ctx context.Context, cfg *config.Config, store storage.TaskStore, runner agent.Runner, task *storage.Task, model string, notifier Notifier, sessionStats *ui.UsageStats, knowledgeClient knowledge.Client) (bool, error) {
 	// Mark task as in progress
 	task.Status = "in_progress"
 	task.Metadata.UpdatedAt = time.Now()
@@ -553,39 +539,6 @@ func printSummary(successCount, failureCount int, session *Session) error {
 	}
 
 	return nil
-}
-
-// filterReadyTasks filters pending tasks to only those whose dependencies are completed
-func filterReadyTasks(store *storage.Storage, pendingTasks []*storage.Task) ([]*storage.Task, error) {
-	// Load all tasks to check dependency status
-	allTasks, err := store.LoadTasks()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load all tasks: %w", err)
-	}
-
-	// Build a map of task statuses for quick lookup
-	taskStatus := make(map[string]string)
-	for _, task := range allTasks {
-		taskStatus[task.ID] = task.Status
-	}
-
-	// Filter to only tasks with all dependencies completed
-	var readyTasks []*storage.Task
-	for _, task := range pendingTasks {
-		isReady := true
-		for _, blockerID := range task.BlockedBy {
-			status, exists := taskStatus[blockerID]
-			if !exists || status != "completed" {
-				isReady = false
-				break
-			}
-		}
-		if isReady {
-			readyTasks = append(readyTasks, task)
-		}
-	}
-
-	return readyTasks, nil
 }
 
 // printDryRunSummary prints a summary of tasks that would be executed

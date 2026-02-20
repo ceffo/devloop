@@ -216,7 +216,10 @@ func ProcessTodoItems(cfg *config.Config, todos []TodoItem, agentName string) ([
 	}
 
 	// Create storage instance to query existing tasks
-	store := storage.NewStorage(cfg)
+	store, err := storage.NewTaskStore(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize storage: %w", err)
+	}
 
 	// Generate next available task ID
 	nextID, err := generateNextTaskID(store, cfg)
@@ -265,7 +268,7 @@ func ProcessTodoItems(cfg *config.Config, todos []TodoItem, agentName string) ([
 
 // generateNextTaskID queries existing tasks and returns the next available ID
 // Supports both hierarchical (1.1, 2.5) and JIRA (DEV-123) formats
-func generateNextTaskID(store *storage.Storage, cfg *config.Config) (string, error) {
+func generateNextTaskID(store storage.TaskStore, cfg *config.Config) (string, error) {
 	tasks, err := store.LoadTasks()
 	if err != nil {
 		return "", fmt.Errorf("failed to load tasks: %w", err)

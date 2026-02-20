@@ -32,7 +32,10 @@ RunE: func(cmd *cobra.Command, _ []string) error {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			store := storage.NewStorage(cfg)
+			store, err := storage.NewTaskStore(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to initialize storage: %w", err)
+			}
 
 			completedTasks, err := store.QueryTasks(storage.Filter{Status: "completed"})
 			if err != nil {

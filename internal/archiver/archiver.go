@@ -31,11 +31,11 @@ type ArchiveResult struct {
 // Archiver handles archival operations for completed tasks
 type Archiver struct {
 	cfg     *config.Config
-	storage *storage.Storage
+	storage storage.TaskStore
 }
 
 // NewArchiver creates a new Archiver instance
-func NewArchiver(cfg *config.Config, store *storage.Storage) *Archiver {
+func NewArchiver(cfg *config.Config, store storage.TaskStore) *Archiver {
 	return &Archiver{
 		cfg:     cfg,
 		storage: store,
