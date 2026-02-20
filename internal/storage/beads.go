@@ -40,9 +40,35 @@ func NewBeadsStore(cfg *config.Config) (*BeadsStore, error) {
 	}, nil
 }
 
-// isBeadsHashID returns true if id looks like a native Beads hash ID (e.g., "bd-x7f3")
+// isBeadsHashID returns true if id looks like a native Beads hash ID.
+// Beads IDs use the format "<lowercase-prefix>-<short-alphanumeric-hash>",
+// e.g. "bd-x7f3" or "devloop-86m". DevLoop IDs use uppercase prefixes
+// like "DEV-57" or numeric formats like "1.1", so they never match.
 func isBeadsHashID(id string) bool {
-	return strings.HasPrefix(id, "bd-")
+	parts := strings.SplitN(id, "-", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	prefix, hash := parts[0], parts[1]
+	// Prefix must be all lowercase letters.
+	if prefix == "" || prefix != strings.ToLower(prefix) {
+		return false
+	}
+	for _, c := range prefix {
+		if c < 'a' || c > 'z' {
+			return false
+		}
+	}
+	// Hash must be 2–10 lowercase alphanumeric characters.
+	if len(hash) < 2 || len(hash) > 10 {
+		return false
+	}
+	for _, c := range hash {
+		if !('a' <= c && c <= 'z' || '0' <= c && c <= '9') {
+			return false
+		}
+	}
+	return true
 }
 
 // resolveBeadsID returns the Beads hash ID for the given ID.
@@ -175,6 +201,46 @@ func beadsStatusToDevloop(beadsStatus BeadsStatusInfo) string {
 	}
 }
 
+// systemLabels are beads labels used internally for status detection.
+// They are excluded from task.Tags.
+var systemLabels = map[string]bool{
+	"failed":    true,
+	"compacted": true,
+}
+
+// beadsTaskData holds all task fields sourced from the Beads system.
+type beadsTaskData struct {
+	ID                 string
+	Title              string
+	Description        string
+	Status             string
+	Complexity         string
+	AcceptanceCriteria []string
+	Tags               []string
+	MaxAttempts        int
+}
+
+// beadsDataToTask builds a *Task from Beads data.
+// Defaults complexity to "simple" for tasks with no complexity set (e.g. created via bd create).
+func beadsDataToTask(bd beadsTaskData) *Task {
+	task := &Task{
+		ID:                 bd.ID,
+		Title:              bd.Title,
+		Description:        bd.Description,
+		Status:             bd.Status,
+		AcceptanceCriteria: bd.AcceptanceCriteria,
+		Tags:               bd.Tags,
+		Complexity:         bd.Complexity,
+	}
+	if bd.MaxAttempts > 0 {
+		task.Metadata.MaxAttempts = bd.MaxAttempts
+	}
+	if task.Complexity == "" {
+		task.Complexity = "simple"
+	}
+	return task
+}
+
 // bdCreateOutput represents the JSON output of `bd create --json`.
 type bdCreateOutput struct {
 	ID string `json:"id"`
@@ -182,27 +248,56 @@ type bdCreateOutput struct {
 
 // bdShowTask represents the JSON output of `bd show --json` and each element of `bd list --json`.
 type bdShowTask struct {
-	ID     string   `json:"id"`
-	Title  string   `json:"title"`
-	Body   string   `json:"body"`
-	Status string   `json:"status"`
-	Labels []string `json:"labels"`
-	Deps   []string `json:"deps"`
+	ID                 string                 `json:"id"`
+	Title              string                 `json:"title"`
+	Description        string                 `json:"description"`
+	AcceptanceCriteria string                 `json:"acceptance_criteria"`
+	Status             string                 `json:"status"`
+	Labels             []string               `json:"labels"`
+	Deps               []string               `json:"deps"`
+	Metadata           map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // bdShowTaskToBeadsData converts a bdShowTask to beadsTaskData with status mapped to devloop.
 func bdShowTaskToBeadsData(t *bdShowTask) beadsTaskData {
 	status := beadsStatusToDevloop(BeadsStatusInfo{Status: t.Status, Labels: t.Labels})
+
+	var complexity string
+	var maxAttempts int
+	if t.Metadata != nil {
+		if c, ok := t.Metadata["complexity"].(string); ok {
+			complexity = c
+		}
+		if ma, ok := t.Metadata["max_attempts"].(float64); ok {
+			maxAttempts = int(ma)
+		}
+	}
+
+	var ac []string
+	if t.AcceptanceCriteria != "" {
+		ac = strings.Split(t.AcceptanceCriteria, "\n")
+	}
+
+	var tags []string
+	for _, l := range t.Labels {
+		if !systemLabels[l] {
+			tags = append(tags, l)
+		}
+	}
+
 	return beadsTaskData{
-		ID:          t.ID,
-		Title:       t.Title,
-		Description: t.Body,
-		Status:      status,
+		ID:                 t.ID,
+		Title:              t.Title,
+		Description:        t.Description,
+		Status:             status,
+		Complexity:         complexity,
+		AcceptanceCriteria: ac,
+		Tags:               tags,
+		MaxAttempts:        maxAttempts,
 	}
 }
 
-// parseBdListOutput parses the JSON array output of `bd list --json` and merges each task
-// with its sidecar file to return a slice of *Task.
+// parseBdListOutput parses the JSON array output of `bd list --json` or `bd ready --json`.
 func (s *BeadsStore) parseBdListOutput(data []byte) ([]*Task, error) {
 	var bdTasks []bdShowTask
 	if err := json.Unmarshal(data, &bdTasks); err != nil {
@@ -212,11 +307,7 @@ func (s *BeadsStore) parseBdListOutput(data []byte) ([]*Task, error) {
 	tasks := make([]*Task, 0, len(bdTasks))
 	for i := range bdTasks {
 		bdTask := &bdTasks[i]
-		sidecar, err := s.readSidecar(bdTask.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read sidecar for %q: %w", bdTask.ID, err)
-		}
-		task := mergeSidecar(bdShowTaskToBeadsData(bdTask), sidecar)
+		task := beadsDataToTask(bdShowTaskToBeadsData(bdTask))
 		task.BlockedBy = bdTask.Deps
 		tasks = append(tasks, task)
 	}
@@ -225,8 +316,7 @@ func (s *BeadsStore) parseBdListOutput(data []byte) ([]*Task, error) {
 }
 
 // GetTask resolves the devloop ID to a Beads ID via KV lookup, fetches the task via
-// `bd show --json`, reads the sidecar, and returns the merged *Task.
-// BlockedBy is populated from the Beads deps field, not the sidecar.
+// `bd show --json`, and returns the *Task. BlockedBy is populated from the Beads deps field.
 func (s *BeadsStore) GetTask(ctx context.Context, id string) (*Task, error) {
 	beadsID, err := s.resolveBeadsID(ctx, id)
 	if err != nil {
@@ -242,18 +332,17 @@ func (s *BeadsStore) GetTask(ctx context.Context, id string) (*Task, error) {
 		return nil, fmt.Errorf("bd show %q failed: %w", beadsID, err)
 	}
 
-	var bdTask bdShowTask
-	if err := json.Unmarshal(out, &bdTask); err != nil {
+	// bd show --json returns an array; take the first element.
+	var bdTasks []bdShowTask
+	if err := json.Unmarshal(out, &bdTasks); err != nil {
 		return nil, fmt.Errorf("failed to parse bd show JSON: %w (output: %s)", err, strings.TrimSpace(string(out)))
 	}
-
-	sidecar, err := s.readSidecar(beadsID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read sidecar for %q: %w", beadsID, err)
+	if len(bdTasks) == 0 {
+		return nil, fmt.Errorf("bd show returned empty result for %q", beadsID)
 	}
 
-	task := mergeSidecar(bdShowTaskToBeadsData(&bdTask), sidecar)
-	task.BlockedBy = bdTask.Deps
+	task := beadsDataToTask(bdShowTaskToBeadsData(&bdTasks[0]))
+	task.BlockedBy = bdTasks[0].Deps
 	return task, nil
 }
 
@@ -307,8 +396,7 @@ func (s *BeadsStore) QueryReadyTasks(ctx context.Context) ([]*Task, error) {
 	return s.parseBdListOutput(out)
 }
 
-// UpdateTask dispatches the status transition to the appropriate bd command(s)
-// and updates the sidecar file with the latest execution and results data.
+// UpdateTask dispatches the status transition to the appropriate bd command(s).
 //   - in_progress: bd update <id> --claim --json (atomic claim)
 //   - completed:   bd close <id> --reason 'Verification passed'
 //   - failed:      bd close <id> --reason 'Verification failed' + bd label add <id> failed
@@ -358,21 +446,6 @@ func (s *BeadsStore) UpdateTask(ctx context.Context, task *Task) error {
 
 	default:
 		return fmt.Errorf("UpdateTask: unsupported status %q for task %q", task.Status, task.ID)
-	}
-
-	// Update sidecar with latest execution and results data
-	sidecar, err := s.readSidecar(beadsID)
-	if err != nil {
-		return fmt.Errorf("UpdateTask: failed to read sidecar for %q: %w", beadsID, err)
-	}
-	if sidecar == nil {
-		sidecar = &TaskSidecar{}
-	}
-	sidecar.Execution = task.Execution
-	sidecar.Results = task.Results
-	sidecar.DecomposedInto = task.DecomposedInto
-	if err := s.writeSidecar(beadsID, sidecar); err != nil {
-		return fmt.Errorf("UpdateTask: failed to write sidecar for %q: %w", beadsID, err)
 	}
 
 	return nil
@@ -492,12 +565,12 @@ func (s *BeadsStore) LoadAllTasks(ctx context.Context) ([]*Task, error) {
 	return s.parseBdListOutput(out)
 }
 
-// SaveTask implements the six-step creation flow:
+// SaveTask implements the creation flow:
 //  1. Write task.Description to a temp file
 //  2. Call `bd create <title> --body-file <tempfile> --json`
 //  3. Parse the returned JSON to capture the Beads hash ID
 //  4. Write bidirectional KV mapping (devloop:<ID> ↔ beads:<beadsID>)
-//  5. Write sidecar file with devloop-specific metadata
+//  5. Set devloop metadata (complexity, acceptance criteria, labels) via `bd update`
 //  6. Link dependencies via `bd dep add` for each BlockedBy entry
 //  7. Remove the temp file
 func (s *BeadsStore) SaveTask(ctx context.Context, task *Task) error {
@@ -507,7 +580,6 @@ func (s *BeadsStore) SaveTask(ctx context.Context, task *Task) error {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	// Ensure cleanup regardless of outcome
 	defer os.Remove(tmpPath)
 
 	if _, err := tmpFile.WriteString(task.Description); err != nil {
@@ -543,18 +615,27 @@ func (s *BeadsStore) SaveTask(ctx context.Context, task *Task) error {
 		return fmt.Errorf("failed to write ID mapping: %w", err)
 	}
 
-	// Step 5: write sidecar file
-	sidecar := &TaskSidecar{
-		DevloopID:          task.ID,
-		Complexity:         task.Complexity,
-		AcceptanceCriteria: task.AcceptanceCriteria,
-		Tags:               task.Tags,
-		MaxAttempts:        task.Metadata.MaxAttempts,
-		Execution:          task.Execution,
-		Results:            task.Results,
+	// Step 5: set devloop metadata in beads
+	metadataJSON, err := json.Marshal(map[string]interface{}{
+		"complexity":   task.Complexity,
+		"max_attempts": task.Metadata.MaxAttempts,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
-	if err := s.writeSidecar(beadsID, sidecar); err != nil {
-		return fmt.Errorf("failed to write sidecar: %w", err)
+	updateArgs := []string{"update", beadsID, "--metadata", string(metadataJSON)}
+	if len(task.AcceptanceCriteria) > 0 {
+		updateArgs = append(updateArgs, "--acceptance", strings.Join(task.AcceptanceCriteria, "\n"))
+	}
+	if len(task.Tags) > 0 {
+		updateArgs = append(updateArgs, "--labels", strings.Join(task.Tags, ","))
+	}
+	updateCtx, cancelUpdate := context.WithTimeout(ctx, 10*time.Second)
+	updateCmd := execCommandContextFunc(updateCtx, s.bdPath, updateArgs...)
+	updateOut, updateErr := updateCmd.CombinedOutput()
+	cancelUpdate()
+	if updateErr != nil {
+		return fmt.Errorf("bd update metadata for %q failed: %w (output: %s)", beadsID, updateErr, strings.TrimSpace(string(updateOut)))
 	}
 
 	// Step 6: link dependencies

@@ -38,6 +38,9 @@
     "auto_commit": true,
     "commit_format": "task {task_id}: {title}"
   },
+  "storage": {
+    "backend": "beads"
+  },
   "archival": {
     "auto_archive": true
   },

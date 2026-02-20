@@ -468,21 +468,10 @@ func stringSlicesEqual(a, b []string) bool {
 
 // --- GetTask tests ---
 
-func TestGetTask_ParsesJSONAndMergesSidecar(t *testing.T) {
-	store := newSidecarTestStore(t)
+func TestGetTask_ParsesBdShowJSON(t *testing.T) {
+	store := newTestStore()
 
-	// Write a sidecar for the beads task
-	sidecar := &TaskSidecar{
-		DevloopID:  "DEV-5",
-		Complexity: "moderate",
-		Tags:       []string{"backend"},
-		MaxAttempts: 3,
-	}
-	if err := store.writeSidecar("bd-x7f3", sidecar); err != nil {
-		t.Fatalf("writeSidecar failed: %v", err)
-	}
-
-	bdJSON := `{"id":"bd-x7f3","title":"My Task","body":"Do the thing","status":"open","labels":[],"deps":["bd-abc1"]}`
+	bdJSON := `[{"id":"bd-x7f3","title":"My Task","description":"Do the thing","status":"open","labels":["backend"],"deps":["bd-abc1"],"metadata":{"complexity":"moderate","max_attempts":3}}]`
 
 	orig := execCommandContextFunc
 	callCount := 0
@@ -527,16 +516,15 @@ func TestGetTask_ParsesJSONAndMergesSidecar(t *testing.T) {
 	if task.Metadata.MaxAttempts != 3 {
 		t.Errorf("MaxAttempts: expected 3, got %d", task.Metadata.MaxAttempts)
 	}
-	// BlockedBy comes from bd show deps, not sidecar
 	if !stringSlicesEqual(task.BlockedBy, []string{"bd-abc1"}) {
 		t.Errorf("BlockedBy: expected [bd-abc1], got %v", task.BlockedBy)
 	}
 }
 
 func TestGetTask_PopulatesBlockedByFromBdShow(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
-	bdJSON := `{"id":"bd-x7f3","title":"Task","body":"desc","status":"blocked","labels":[],"deps":["bd-dep1","bd-dep2"]}`
+	bdJSON := `[{"id":"bd-x7f3","title":"Task","description":"desc","status":"blocked","labels":[],"deps":["bd-dep1","bd-dep2"]}]`
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("echo '"+bdJSON+"'", nil)
@@ -554,7 +542,7 @@ func TestGetTask_PopulatesBlockedByFromBdShow(t *testing.T) {
 }
 
 func TestGetTask_BdShowFails(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("exit 1", nil)
@@ -567,7 +555,7 @@ func TestGetTask_BdShowFails(t *testing.T) {
 }
 
 func TestGetTask_InvalidJSON(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("echo 'not json'", nil)
@@ -582,9 +570,9 @@ func TestGetTask_InvalidJSON(t *testing.T) {
 // --- LoadTasks tests ---
 
 func TestLoadTasks_ParsesJSONList(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
-	listJSON := `[{"id":"bd-aaa1","title":"Task A","body":"body a","status":"open","labels":[],"deps":[]},{"id":"bd-bbb2","title":"Task B","body":"body b","status":"in_progress","labels":[],"deps":["bd-aaa1"]}]`
+	listJSON := `[{"id":"bd-aaa1","title":"Task A","description":"body a","status":"open","labels":[],"deps":[]},{"id":"bd-bbb2","title":"Task B","description":"body b","status":"in_progress","labels":[],"deps":["bd-aaa1"]}]`
 
 	orig := execCommandContextFunc
 	var capturedArgs [][]string
@@ -626,7 +614,7 @@ func TestLoadTasks_ParsesJSONList(t *testing.T) {
 }
 
 func TestLoadTasks_EmptyList(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("echo '[]'", nil)
@@ -641,15 +629,10 @@ func TestLoadTasks_EmptyList(t *testing.T) {
 	}
 }
 
-func TestLoadTasks_MergesSidecar(t *testing.T) {
-	store := newSidecarTestStore(t)
+func TestLoadTasks_ReadsComplexityFromMetadata(t *testing.T) {
+	store := newTestStore()
 
-	// Write a sidecar for bd-aaa1
-	if err := store.writeSidecar("bd-aaa1", &TaskSidecar{DevloopID: "DEV-1", Complexity: "simple"}); err != nil {
-		t.Fatalf("writeSidecar failed: %v", err)
-	}
-
-	listJSON := `[{"id":"bd-aaa1","title":"Task A","body":"body","status":"open","labels":[],"deps":[]}]`
+	listJSON := `[{"id":"bd-aaa1","title":"Task A","description":"body","status":"open","labels":[],"deps":[],"metadata":{"complexity":"simple"}}]`
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("echo '"+listJSON+"'", nil)
@@ -670,7 +653,7 @@ func TestLoadTasks_MergesSidecar(t *testing.T) {
 // --- QueryTasks tests ---
 
 func TestQueryTasks_MapsStatusFilter(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	var capturedArgs [][]string
@@ -692,7 +675,7 @@ func TestQueryTasks_MapsStatusFilter(t *testing.T) {
 }
 
 func TestQueryTasks_NoStatusFilter(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	var capturedArgs [][]string
@@ -714,7 +697,7 @@ func TestQueryTasks_NoStatusFilter(t *testing.T) {
 }
 
 func TestQueryTasks_CompletedMapsToClosedStatus(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	var capturedArgs [][]string
@@ -735,7 +718,7 @@ func TestQueryTasks_CompletedMapsToClosedStatus(t *testing.T) {
 // --- QueryReadyTasks tests ---
 
 func TestQueryReadyTasks_CallsBdReady(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	var capturedArgs [][]string
@@ -760,15 +743,10 @@ func TestQueryReadyTasks_CallsBdReady(t *testing.T) {
 	}
 }
 
-func TestQueryReadyTasks_ParsesJSONAndMergesSidecar(t *testing.T) {
-	store := newSidecarTestStore(t)
+func TestQueryReadyTasks_ReadsComplexityFromMetadata(t *testing.T) {
+	store := newTestStore()
 
-	// Write a sidecar for bd-aaa1
-	if err := store.writeSidecar("bd-aaa1", &TaskSidecar{DevloopID: "DEV-1", Complexity: "simple"}); err != nil {
-		t.Fatalf("writeSidecar failed: %v", err)
-	}
-
-	readyJSON := `[{"id":"bd-aaa1","title":"Ready Task","body":"description","status":"open","labels":[],"deps":[]}]`
+	readyJSON := `[{"id":"bd-aaa1","title":"Ready Task","description":"description","status":"open","labels":[],"deps":[],"metadata":{"complexity":"simple"}}]`
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("echo '"+readyJSON+"'", nil)
@@ -791,7 +769,7 @@ func TestQueryReadyTasks_ParsesJSONAndMergesSidecar(t *testing.T) {
 }
 
 func TestQueryReadyTasks_EmptyWhenNoTasksReady(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("echo '[]'", nil)
@@ -811,7 +789,7 @@ func TestQueryReadyTasks_EmptyWhenNoTasksReady(t *testing.T) {
 }
 
 func TestQueryReadyTasks_BdReadyFails(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("exit 1", nil)
@@ -827,7 +805,7 @@ func TestQueryReadyTasks_BdReadyFails(t *testing.T) {
 }
 
 func TestQueryReadyTasks_InvalidJSON(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("echo 'not json'", nil)
@@ -842,7 +820,7 @@ func TestQueryReadyTasks_InvalidJSON(t *testing.T) {
 // --- UpdateTask tests ---
 
 func TestUpdateTask_InProgress_ClaimsCalled(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	var capturedArgs [][]string
 	orig := execCommandContextFunc
@@ -882,21 +860,14 @@ func TestUpdateTask_InProgress_ClaimsCalled(t *testing.T) {
 		t.Errorf("expected beads ID 'bd-x7f3' in first call args: %v", capturedArgs[0])
 	}
 
-	// Verify sidecar was updated
-	sidecar, err := store.readSidecar("bd-x7f3")
-	if err != nil {
-		t.Fatalf("readSidecar failed: %v", err)
-	}
-	if sidecar == nil {
-		t.Fatal("expected sidecar to be written after UpdateTask")
-	}
-	if sidecar.Execution.TotalDuration != 30 {
-		t.Errorf("expected TotalDuration=30, got %d", sidecar.Execution.TotalDuration)
+	// Only one bd call for in_progress (claim)
+	if len(capturedArgs) != 1 {
+		t.Errorf("expected exactly 1 exec call for in_progress, got %d", len(capturedArgs))
 	}
 }
 
 func TestUpdateTask_Completed_CloseCalled(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	var capturedArgs [][]string
 	orig := execCommandContextFunc
@@ -938,25 +909,10 @@ func TestUpdateTask_Completed_CloseCalled(t *testing.T) {
 	if len(capturedArgs) != 1 {
 		t.Errorf("expected exactly 1 exec call for completed, got %d", len(capturedArgs))
 	}
-
-	// Verify sidecar was updated with results
-	sidecar, err := store.readSidecar("bd-x7f3")
-	if err != nil {
-		t.Fatalf("readSidecar failed: %v", err)
-	}
-	if sidecar == nil {
-		t.Fatal("expected sidecar to be written after UpdateTask")
-	}
-	if sidecar.Results == nil {
-		t.Fatal("expected Results to be set in sidecar")
-	}
-	if sidecar.Results.CommitHash != "abc123" {
-		t.Errorf("expected CommitHash=abc123, got %q", sidecar.Results.CommitHash)
-	}
 }
 
 func TestUpdateTask_Failed_CloseAndLabelCalled(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	var capturedArgs [][]string
 	orig := execCommandContextFunc
@@ -1000,19 +956,10 @@ func TestUpdateTask_Failed_CloseAndLabelCalled(t *testing.T) {
 	if !contains(second, "failed") {
 		t.Errorf("expected 'failed' in second call: %v", capturedArgs[1])
 	}
-
-	// Verify sidecar was written
-	sidecar, err := store.readSidecar("bd-x7f3")
-	if err != nil {
-		t.Fatalf("readSidecar failed: %v", err)
-	}
-	if sidecar == nil {
-		t.Fatal("expected sidecar to be written after UpdateTask")
-	}
 }
 
 func TestUpdateTask_UnsupportedStatus_ReturnsError(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -1031,54 +978,6 @@ func TestUpdateTask_UnsupportedStatus_ReturnsError(t *testing.T) {
 	}
 	if !contains(err.Error(), "unsupported status") {
 		t.Errorf("expected 'unsupported status' in error, got: %v", err)
-	}
-}
-
-func TestUpdateTask_InProgress_PreservesSidecarFields(t *testing.T) {
-	store := newSidecarTestStore(t)
-
-	// Pre-write a sidecar with metadata
-	if err := store.writeSidecar("bd-x7f3", &TaskSidecar{
-		DevloopID:  "DEV-10",
-		Complexity: "complex",
-		MaxAttempts: 5,
-	}); err != nil {
-		t.Fatalf("writeSidecar failed: %v", err)
-	}
-
-	orig := execCommandContextFunc
-	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "sh", "-c", "true")
-	}
-	defer func() { execCommandContextFunc = orig }()
-
-	task := &Task{
-		ID:     "bd-x7f3",
-		Status: "in_progress",
-		Execution: TaskExecution{TotalDuration: 60},
-	}
-
-	if err := store.UpdateTask(context.Background(), task); err != nil {
-		t.Fatalf("UpdateTask failed: %v", err)
-	}
-
-	sidecar, err := store.readSidecar("bd-x7f3")
-	if err != nil {
-		t.Fatalf("readSidecar failed: %v", err)
-	}
-	// Existing fields should be preserved
-	if sidecar.DevloopID != "DEV-10" {
-		t.Errorf("DevloopID: expected DEV-10, got %q", sidecar.DevloopID)
-	}
-	if sidecar.Complexity != "complex" {
-		t.Errorf("Complexity: expected complex, got %q", sidecar.Complexity)
-	}
-	if sidecar.MaxAttempts != 5 {
-		t.Errorf("MaxAttempts: expected 5, got %d", sidecar.MaxAttempts)
-	}
-	// Execution should be updated
-	if sidecar.Execution.TotalDuration != 60 {
-		t.Errorf("TotalDuration: expected 60, got %d", sidecar.Execution.TotalDuration)
 	}
 }
 
@@ -1113,15 +1012,16 @@ func mockExecCommandSequence(shellCmds []string, capturedArgs *[][]string) func(
 }
 
 func TestSaveTask_BasicCreationFlow(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	var capturedArgs [][]string
 	orig := execCommandContextFunc
-	// Sequence: bd create → bd kv set (devloop:) → bd kv set (beads:)
+	// Sequence: bd create → 2x kv set → bd update (metadata/acceptance/labels)
 	execCommandContextFunc = mockExecCommandSequence([]string{
 		`echo '{"id":"bd-a1b2"}'`, // bd create --json
 		"true",                    // bd kv set devloop:DEV-1 bd-a1b2
 		"true",                    // bd kv set beads:bd-a1b2 DEV-1
+		"true",                    // bd update --metadata --acceptance --labels
 	}, &capturedArgs)
 	defer func() { execCommandContextFunc = orig }()
 
@@ -1158,8 +1058,8 @@ func TestSaveTask_BasicCreationFlow(t *testing.T) {
 	}
 
 	// Verify KV mapping calls
-	if len(capturedArgs) < 3 {
-		t.Fatalf("expected at least 3 exec calls (create + 2 kv set), got %d", len(capturedArgs))
+	if len(capturedArgs) < 4 {
+		t.Fatalf("expected at least 4 exec calls (create + 2 kv set + update), got %d", len(capturedArgs))
 	}
 	kvCall1 := joinArgs(capturedArgs[1])
 	if !contains(kvCall1, "kv") || !contains(kvCall1, "set") {
@@ -1183,41 +1083,42 @@ func TestSaveTask_BasicCreationFlow(t *testing.T) {
 		t.Errorf("expected 'DEV-1' in kv set call: %v", capturedArgs[2])
 	}
 
-	// Verify sidecar was written
-	sidecar, err := store.readSidecar("bd-a1b2")
-	if err != nil {
-		t.Fatalf("readSidecar failed: %v", err)
+	// Verify bd update was called with metadata, acceptance, and labels
+	updateCall := joinArgs(capturedArgs[3])
+	if !contains(updateCall, "update") {
+		t.Errorf("expected 'update' in fourth call: %v", capturedArgs[3])
 	}
-	if sidecar == nil {
-		t.Fatal("expected sidecar to be written")
+	if !contains(updateCall, "--metadata") {
+		t.Errorf("expected '--metadata' in update call: %v", capturedArgs[3])
 	}
-	if sidecar.DevloopID != "DEV-1" {
-		t.Errorf("DevloopID: expected DEV-1, got %q", sidecar.DevloopID)
+	if !contains(updateCall, "simple") {
+		t.Errorf("expected complexity 'simple' in metadata: %v", capturedArgs[3])
 	}
-	if sidecar.Complexity != "simple" {
-		t.Errorf("Complexity: expected simple, got %q", sidecar.Complexity)
+	if !contains(updateCall, "--acceptance") {
+		t.Errorf("expected '--acceptance' in update call: %v", capturedArgs[3])
 	}
-	if len(sidecar.AcceptanceCriteria) != 1 || sidecar.AcceptanceCriteria[0] != "it works" {
-		t.Errorf("AcceptanceCriteria: expected [it works], got %v", sidecar.AcceptanceCriteria)
+	if !contains(updateCall, "it works") {
+		t.Errorf("expected acceptance criteria in update call: %v", capturedArgs[3])
 	}
-	if len(sidecar.Tags) != 1 || sidecar.Tags[0] != "backend" {
-		t.Errorf("Tags: expected [backend], got %v", sidecar.Tags)
+	if !contains(updateCall, "--labels") {
+		t.Errorf("expected '--labels' in update call: %v", capturedArgs[3])
 	}
-	if sidecar.MaxAttempts != 3 {
-		t.Errorf("MaxAttempts: expected 3, got %d", sidecar.MaxAttempts)
+	if !contains(updateCall, "backend") {
+		t.Errorf("expected tag 'backend' in update call: %v", capturedArgs[3])
 	}
 }
 
 func TestSaveTask_WithDependencies(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	var capturedArgs [][]string
 	orig := execCommandContextFunc
-	// Sequence: bd create → 2x kv set → bd kv get DEV-2 → bd dep add
+	// Sequence: bd create → 2x kv set → bd update (metadata) → bd kv get DEV-2 → bd dep add
 	execCommandContextFunc = mockExecCommandSequence([]string{
 		`echo '{"id":"bd-c3d4"}'`, // bd create
 		"true",                    // bd kv set devloop:DEV-3
 		"true",                    // bd kv set beads:bd-c3d4
+		"true",                    // bd update --metadata
 		"echo bd-e5f6",            // bd kv get devloop:DEV-2
 		"true",                    // bd dep add
 	}, &capturedArgs)
@@ -1234,26 +1135,26 @@ func TestSaveTask_WithDependencies(t *testing.T) {
 		t.Fatalf("SaveTask with dependency failed: %v", err)
 	}
 
-	// Should have 5 calls: create, 2 kv set, kv get (resolve dep), dep add
-	if len(capturedArgs) != 5 {
-		t.Fatalf("expected 5 exec calls, got %d: %v", len(capturedArgs), capturedArgs)
+	// Should have 6 calls: create, 2 kv set, update (metadata), kv get (resolve dep), dep add
+	if len(capturedArgs) != 6 {
+		t.Fatalf("expected 6 exec calls, got %d: %v", len(capturedArgs), capturedArgs)
 	}
 
 	// Verify dep add call
-	depCall := joinArgs(capturedArgs[4])
+	depCall := joinArgs(capturedArgs[5])
 	if !contains(depCall, "dep") || !contains(depCall, "add") {
 		t.Errorf("expected 'dep add' in last call: %v", capturedArgs[4])
 	}
 	if !contains(depCall, "bd-c3d4") {
-		t.Errorf("expected task ID 'bd-c3d4' in dep add call: %v", capturedArgs[4])
+		t.Errorf("expected task ID 'bd-c3d4' in dep add call: %v", capturedArgs[5])
 	}
 	if !contains(depCall, "bd-e5f6") {
-		t.Errorf("expected dep ID 'bd-e5f6' in dep add call: %v", capturedArgs[4])
+		t.Errorf("expected dep ID 'bd-e5f6' in dep add call: %v", capturedArgs[5])
 	}
 }
 
 func TestSaveTask_TempFileCleanedUp(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	var tempFilePath string
 	orig := execCommandContextFunc
@@ -1293,7 +1194,7 @@ func TestSaveTask_TempFileCleanedUp(t *testing.T) {
 }
 
 func TestSaveTask_BdCreateFails(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("exit 1", nil)
@@ -1315,7 +1216,7 @@ func TestSaveTask_BdCreateFails(t *testing.T) {
 }
 
 func TestSaveTask_BdCreateReturnsInvalidJSON(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand("echo 'not json'", nil)
@@ -1337,7 +1238,7 @@ func TestSaveTask_BdCreateReturnsInvalidJSON(t *testing.T) {
 }
 
 func TestSaveTask_BdCreateReturnsEmptyID(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	execCommandContextFunc = mockExecCommand(`echo '{"id":""}'`, nil)
@@ -1359,7 +1260,7 @@ func TestSaveTask_BdCreateReturnsEmptyID(t *testing.T) {
 }
 
 func TestSaveTask_DepAddFails(t *testing.T) {
-	store := newSidecarTestStore(t)
+	store := newTestStore()
 
 	orig := execCommandContextFunc
 	callCount := 0
@@ -1370,7 +1271,9 @@ func TestSaveTask_DepAddFails(t *testing.T) {
 			return exec.CommandContext(ctx, "sh", "-c", `echo '{"id":"bd-i9j0"}'`)
 		case 2, 3: // bd kv set
 			return exec.CommandContext(ctx, "sh", "-c", "true")
-		case 4: // bd kv get (resolve dep)
+		case 4: // bd update --metadata
+			return exec.CommandContext(ctx, "sh", "-c", "true")
+		case 5: // bd kv get (resolve dep)
 			return exec.CommandContext(ctx, "sh", "-c", "echo bd-k1l2")
 		default: // bd dep add - fail
 			return exec.CommandContext(ctx, "sh", "-c", "exit 1")
