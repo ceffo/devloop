@@ -6,6 +6,12 @@ import (
 	"github.com/ceffo/devloop/internal/config"
 )
 
+// Syncer is implemented by storage backends that support explicit synchronization.
+// Sync is backend-specific and not part of the TaskStore interface.
+type Syncer interface {
+	Sync() error
+}
+
 // TaskStore defines the contract that all storage backends must implement
 // for persisting and querying tasks.
 type TaskStore interface {

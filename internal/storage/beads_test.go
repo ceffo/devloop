@@ -1393,3 +1393,46 @@ func TestSaveTask_DepAddFails(t *testing.T) {
 		t.Errorf("expected 'bd dep add' in error, got: %v", err)
 	}
 }
+
+// --- Sync tests ---
+
+func TestSync_Success(t *testing.T) {
+store := newTestStore()
+
+var capturedArgs [][]string
+orig := execCommandContextFunc
+execCommandContextFunc = mockExecCommand("echo synced", &capturedArgs)
+defer func() { execCommandContextFunc = orig }()
+
+err := store.Sync()
+if err != nil {
+t.Fatalf("Sync() should succeed: %v", err)
+}
+
+if len(capturedArgs) != 1 {
+t.Fatalf("expected 1 exec call, got %d", len(capturedArgs))
+}
+args := capturedArgs[0]
+if args[0] != "/usr/local/bin/bd" {
+t.Errorf("expected bd binary, got %q", args[0])
+}
+if len(args) != 2 || args[1] != "sync" {
+t.Errorf("expected 'bd sync', got %v", args[1:])
+}
+}
+
+func TestSync_Failure(t *testing.T) {
+store := newTestStore()
+
+orig := execCommandContextFunc
+execCommandContextFunc = mockExecCommand("exit 1", nil)
+defer func() { execCommandContextFunc = orig }()
+
+err := store.Sync()
+if err == nil {
+t.Fatal("Sync() should fail when bd sync fails")
+}
+if !contains(err.Error(), "bd sync failed") {
+t.Errorf("expected 'bd sync failed' in error, got: %v", err)
+}
+}

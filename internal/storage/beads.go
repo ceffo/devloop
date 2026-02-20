@@ -377,6 +377,21 @@ func (s *BeadsStore) UpdateTask(ctx context.Context, task *Task) error {
 	return nil
 }
 
+// Sync calls `bd sync` to synchronize the Beads store with the remote.
+// It is not part of the TaskStore interface; callers use a type assertion.
+// Sync failures should be treated as warnings, not fatal errors.
+func (s *BeadsStore) Sync() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := execCommandContextFunc(ctx, s.bdPath, "sync")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("bd sync failed: %w (output: %s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 // SaveTask implements the six-step creation flow:
 //  1. Write task.Description to a temp file
 //  2. Call `bd create <title> --body-file <tempfile> --json`

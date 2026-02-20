@@ -263,6 +263,13 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 		}
 	}
 
+	// Sync storage if backend supports it; failures are non-fatal warnings.
+	if syncer, ok := store.(storage.Syncer); ok {
+		if err := syncer.Sync(); err != nil {
+			notifier.Log(fmt.Sprintf("Warning: sync failed: %v", err))
+		}
+	}
+
 	notifier.AgentStatusUpdate("", "")
 	notifier.Done(nil)
 	_ = notifier.Wait()
