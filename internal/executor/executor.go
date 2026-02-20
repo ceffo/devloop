@@ -2,8 +2,11 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ceffo/devloop/internal/agent"
@@ -179,6 +182,28 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 		notifier.AgentStatusUpdate(selectedAgentName, model)
 		notifier.Log(fmt.Sprintf("Task %d: %s - %s [%s/%s/%s]",
 			taskNumber, task.ID, task.Title, task.Complexity, model, selectedAgentName))
+
+		// Run coordinator (if enabled) to decide whether to decompose the task
+		if cfg.Execution.Coordinator.Enabled {
+			coordinatorModel := cfg.Execution.Coordinator.Model
+			if coordinatorModel == "" {
+				coordinatorModel = model
+			}
+			notifier.Log(fmt.Sprintf("  Running coordinator for %s...", task.ID))
+			decomposed, subtasks, coordErr := runCoordinator(ctx, cfg, store, agentRunner, task, coordinatorModel, notifier)
+			if coordErr != nil {
+				notifier.Log(fmt.Sprintf("  ⚠ Coordinator failed for %s: %v (proceeding with direct execution)", task.ID, coordErr))
+			} else if decomposed {
+				notifier.Log(fmt.Sprintf("  ✓ Task %s decomposed into %d subtask(s)", task.ID, len(subtasks)))
+				for _, st := range subtasks {
+					if !executedTaskIDs[st.ID] {
+						tasks = append(tasks, st)
+					}
+				}
+				// Skip direct execution of the original task — subtasks handle the work
+				continue
+			}
+		}
 
 		// Execute task with retries, passing notifier for status updates
 		success, err := executeTask(ctx, cfg, store, agentRunner, task, model, notifier, sessionStats, knowledgeClient)
@@ -546,6 +571,125 @@ func printSummary(successCount, failureCount int, session *Session) error {
 	}
 
 	return nil
+}
+
+// coordinatorSubtaskDef is the shape of each object in coordinator-output.json.
+type coordinatorSubtaskDef struct {
+	Title              string   `json:"title"`
+	Description        string   `json:"description"`
+	Complexity         string   `json:"complexity"`
+	AcceptanceCriteria []string `json:"acceptance_criteria"`
+	BlockedBy          []string `json:"blocked_by"`
+	Tags               []string `json:"tags"`
+}
+
+// runCoordinator runs the coordinator agent for a task to decide whether to decompose it.
+// It renders the coordinator prompt, executes the agent, and parses sentinel output.
+//
+// Returns (decomposed, subtasks, error):
+//   - decomposed=false: the original task should proceed to executeTask as-is.
+//   - decomposed=true: the task was split; subtasks have been saved to the store
+//     and should be appended to the execution queue.
+func runCoordinator(ctx context.Context, cfg *config.Config, store storage.TaskStore, runner agent.Runner, task *storage.Task, model string, notifier Notifier) (bool, []*storage.Task, error) {
+	// Render coordinator prompt
+	prompt, err := prompts.RenderCoordinatorPrompt(cfg, task)
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to render coordinator prompt: %w", err)
+	}
+
+	// Build log path
+	timestamp := time.Now().Format("20060102-150405")
+	logPath := filepath.Join(cfg.Project.Path, ".devloop", "logs",
+		fmt.Sprintf("coordinator-%s-%s.log", task.ID, timestamp))
+
+	// Execute agent
+	result, err := runner.RunWithOutput(model, prompt, logPath, notifier.AgentOutput)
+	if err != nil {
+		return false, nil, fmt.Errorf("coordinator agent execution failed: %w", err)
+	}
+	if !result.Success {
+		return false, nil, fmt.Errorf("coordinator agent returned failure for task %s", task.ID)
+	}
+
+	output := result.Output
+
+	if !strings.Contains(output, prompts.SentinelDecomposed) {
+		// ##DEVLOOP:PROCEED## or no sentinel: execute the task as-is
+		return false, nil, nil
+	}
+
+	// ##DEVLOOP:DECOMPOSED## — gather newly created subtasks
+	var subtasks []*storage.Task
+
+	if cfg.Storage.Backend == "beads" {
+		// Re-query bd ready to surface subtasks the agent created via bd commands.
+		// BeadsStore uses context-aware methods; convert to any first to allow assertion.
+		type readyQuerier interface {
+			QueryReadyTasks(ctx context.Context) ([]*storage.Task, error)
+		}
+		beadsStore, ok := any(store).(readyQuerier)
+		if !ok {
+			return false, nil, fmt.Errorf("storage backend is beads but store does not implement QueryReadyTasks(context.Context)")
+		}
+		subtasks, err = beadsStore.QueryReadyTasks(ctx)
+		if err != nil {
+			return false, nil, fmt.Errorf("failed to query beads ready tasks after decompose: %w", err)
+		}
+	} else {
+		// JSONL backend: read coordinator-output.json and persist subtasks
+		subtasks, err = loadAndSaveCoordinatorOutput(cfg, store, task)
+		if err != nil {
+			return false, nil, fmt.Errorf("failed to load coordinator output: %w", err)
+		}
+	}
+
+	return true, subtasks, nil
+}
+
+// loadAndSaveCoordinatorOutput reads .devloop/coordinator-output.json, converts each entry
+// into a storage.Task (with IDs derived from the parent), and saves them to the store.
+func loadAndSaveCoordinatorOutput(cfg *config.Config, store storage.TaskStore, parentTask *storage.Task) ([]*storage.Task, error) {
+	outputPath := filepath.Join(cfg.Project.Path, ".devloop", "coordinator-output.json")
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read coordinator-output.json: %w", err)
+	}
+
+	var defs []coordinatorSubtaskDef
+	if err := json.Unmarshal(data, &defs); err != nil {
+		return nil, fmt.Errorf("failed to parse coordinator-output.json: %w", err)
+	}
+
+	now := time.Now()
+	tasks := make([]*storage.Task, 0, len(defs))
+	for i, def := range defs {
+		subtask := &storage.Task{
+			ID:                 fmt.Sprintf("%s.%d", parentTask.ID, i+1),
+			Title:              def.Title,
+			Description:        def.Description,
+			Complexity:         def.Complexity,
+			AcceptanceCriteria: def.AcceptanceCriteria,
+			BlockedBy:          def.BlockedBy,
+			Tags:               def.Tags,
+			Status:             "pending",
+			Metadata: storage.TaskMetadata{
+				CreatedAt:   now,
+				UpdatedAt:   now,
+				SourceType:  "coordinator",
+				MaxAttempts: cfg.Execution.MaxAttempts,
+			},
+			Execution: storage.TaskExecution{
+				Attempts: []storage.Attempt{},
+			},
+		}
+		if err := store.SaveTask(subtask); err != nil {
+			return nil, fmt.Errorf("failed to save subtask %s: %w", subtask.ID, err)
+		}
+		tasks = append(tasks, subtask)
+	}
+
+	return tasks, nil
 }
 
 // printDryRunSummary prints a summary of tasks that would be executed

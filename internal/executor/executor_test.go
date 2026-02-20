@@ -464,3 +464,216 @@ func TestExecuteTaskContextCancellation(t *testing.T) {
 		t.Errorf("Expected task to not succeed when context is cancelled")
 	}
 }
+
+// mockOutputRunner is a mock agent runner that returns a configurable output string.
+type mockOutputRunner struct {
+	output  string
+	success bool
+}
+
+func (m *mockOutputRunner) Run(model, prompt, logPath string) (*agent.Result, error) {
+	return m.RunWithOutput(model, prompt, logPath, nil)
+}
+
+func (m *mockOutputRunner) RunWithOutput(model, prompt, logPath string, outputFn agent.OutputCallback) (*agent.Result, error) {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(logPath, []byte(m.output), 0644); err != nil {
+		return nil, err
+	}
+	if outputFn != nil {
+		outputFn(m.output)
+	}
+	return &agent.Result{
+		LogPath: logPath,
+		Output:  m.output,
+		Success: m.success,
+	}, nil
+}
+
+// TestRunCoordinatorProceed verifies that ##DEVLOOP:PROCEED## returns decomposed=false.
+func TestRunCoordinatorProceed(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.Config{
+		Project: config.ProjectConfig{
+			Path:      tmpDir,
+			Name:      "test",
+			TechStack: "Go",
+		},
+		Storage: config.StorageConfig{Backend: "jsonl"},
+		Execution: config.ExecutionConfig{
+			MaxAttempts: 2,
+			Coordinator: config.CoordinatorConfig{
+				Enabled:     true,
+				MaxSubtasks: 5,
+			},
+		},
+	}
+
+	store := storage.NewStorage(cfg)
+
+	task := &storage.Task{
+		ID:          "DEV-1",
+		Title:       "Test task",
+		Description: "A test task",
+		Complexity:  "complex",
+		Status:      "pending",
+	}
+
+	runner := &mockOutputRunner{
+		output:  "Analyzing task...\n##DEVLOOP:PROCEED##\n",
+		success: true,
+	}
+
+	ctx := context.Background()
+	decomposed, subtasks, err := runCoordinator(ctx, cfg, store, runner, task, "test-model", newPlainNotifier())
+
+	if err != nil {
+		t.Fatalf("runCoordinator returned unexpected error: %v", err)
+	}
+	if decomposed {
+		t.Errorf("Expected decomposed=false for PROCEED sentinel, got true")
+	}
+	if len(subtasks) != 0 {
+		t.Errorf("Expected no subtasks for PROCEED, got %d", len(subtasks))
+	}
+}
+
+// TestRunCoordinatorDecomposedJSONL verifies the JSONL decompose path:
+// reads coordinator-output.json, saves subtasks, and returns decomposed=true.
+func TestRunCoordinatorDecomposedJSONL(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.Config{
+		Project: config.ProjectConfig{
+			Path:      tmpDir,
+			Name:      "test",
+			TechStack: "Go",
+		},
+		Storage: config.StorageConfig{Backend: "jsonl"},
+		Execution: config.ExecutionConfig{
+			MaxAttempts: 2,
+			Coordinator: config.CoordinatorConfig{
+				Enabled:     true,
+				MaxSubtasks: 5,
+			},
+		},
+	}
+
+	// Write coordinator-output.json
+	devloopDir := filepath.Join(tmpDir, ".devloop")
+	if err := os.MkdirAll(devloopDir, 0755); err != nil {
+		t.Fatalf("Failed to create .devloop dir: %v", err)
+	}
+	outputJSON := `[
+		{
+			"title": "Subtask A",
+			"description": "Do part A",
+			"complexity": "simple",
+			"acceptance_criteria": ["A works"],
+			"blocked_by": [],
+			"tags": ["part-a"]
+		},
+		{
+			"title": "Subtask B",
+			"description": "Do part B",
+			"complexity": "moderate",
+			"acceptance_criteria": ["B works"],
+			"blocked_by": [],
+			"tags": ["part-b"]
+		}
+	]`
+	if err := os.WriteFile(filepath.Join(devloopDir, "coordinator-output.json"), []byte(outputJSON), 0644); err != nil {
+		t.Fatalf("Failed to write coordinator-output.json: %v", err)
+	}
+
+	store := storage.NewStorage(cfg)
+
+	task := &storage.Task{
+		ID:          "DEV-1",
+		Title:       "Complex task",
+		Description: "A complex task to decompose",
+		Complexity:  "complex",
+		Status:      "pending",
+	}
+
+	runner := &mockOutputRunner{
+		output:  "Creating subtasks...\n##DEVLOOP:DECOMPOSED##\n",
+		success: true,
+	}
+
+	ctx := context.Background()
+	decomposed, subtasks, err := runCoordinator(ctx, cfg, store, runner, task, "test-model", newPlainNotifier())
+
+	if err != nil {
+		t.Fatalf("runCoordinator returned unexpected error: %v", err)
+	}
+	if !decomposed {
+		t.Errorf("Expected decomposed=true for DECOMPOSED sentinel, got false")
+	}
+	if len(subtasks) != 2 {
+		t.Fatalf("Expected 2 subtasks, got %d", len(subtasks))
+	}
+
+	// Verify subtask IDs follow the parent.N pattern
+	if subtasks[0].ID != "DEV-1.1" {
+		t.Errorf("Expected first subtask ID 'DEV-1.1', got %q", subtasks[0].ID)
+	}
+	if subtasks[1].ID != "DEV-1.2" {
+		t.Errorf("Expected second subtask ID 'DEV-1.2', got %q", subtasks[1].ID)
+	}
+
+	// Verify subtasks were persisted to the store
+	saved, err := store.GetTask("DEV-1.1")
+	if err != nil {
+		t.Errorf("Subtask DEV-1.1 was not saved to store: %v", err)
+	} else if saved.Title != "Subtask A" {
+		t.Errorf("Expected saved title 'Subtask A', got %q", saved.Title)
+	}
+
+	saved2, err := store.GetTask("DEV-1.2")
+	if err != nil {
+		t.Errorf("Subtask DEV-1.2 was not saved to store: %v", err)
+	} else if saved2.Complexity != "moderate" {
+		t.Errorf("Expected subtask 2 complexity 'moderate', got %q", saved2.Complexity)
+	}
+}
+
+// TestRunCoordinatorAgentFailure verifies that an agent failure returns an error.
+func TestRunCoordinatorAgentFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.Config{
+		Project: config.ProjectConfig{
+			Path:      tmpDir,
+			Name:      "test",
+			TechStack: "Go",
+		},
+		Storage: config.StorageConfig{Backend: "jsonl"},
+		Execution: config.ExecutionConfig{
+			MaxAttempts: 2,
+		},
+	}
+
+	store := storage.NewStorage(cfg)
+
+	task := &storage.Task{
+		ID:         "DEV-1",
+		Title:      "Test task",
+		Complexity: "complex",
+		Status:     "pending",
+	}
+
+	runner := &mockOutputRunner{
+		output:  "error output",
+		success: false, // agent reports failure
+	}
+
+	ctx := context.Background()
+	_, _, err := runCoordinator(ctx, cfg, store, runner, task, "test-model", newPlainNotifier())
+	if err == nil {
+		t.Error("Expected error when agent returns failure, got nil")
+	}
+}
