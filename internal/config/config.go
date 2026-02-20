@@ -66,12 +66,21 @@ type CLIConfig struct {
 	Agents map[string]*AgentConfig `json:"agents,omitempty"`
 }
 
+// CoordinatorConfig controls coordinator behavior
+type CoordinatorConfig struct {
+	Enabled      bool   `json:"enabled"`
+	Agent        string `json:"agent"`
+	Model        string `json:"model"`
+	MaxSubtasks  int    `json:"max_subtasks"`
+}
+
 // ExecutionConfig controls task execution behavior
 type ExecutionConfig struct {
-	MaxAttempts   int    `json:"max_attempts"`
-	HaltOnFailure bool   `json:"halt_on_failure"`
-	AutoCommit    bool   `json:"auto_commit"`
-	CommitFormat  string `json:"commit_format,omitempty"`
+	MaxAttempts   int                `json:"max_attempts"`
+	HaltOnFailure bool               `json:"halt_on_failure"`
+	AutoCommit    bool               `json:"auto_commit"`
+	CommitFormat  string             `json:"commit_format,omitempty"`
+	Coordinator   CoordinatorConfig  `json:"coordinator,omitempty"`
 }
 
 // ArchivalConfig controls archival behavior
@@ -224,6 +233,9 @@ func getDefaultConfig() *Config {
 			HaltOnFailure: true,
 			AutoCommit:    true,
 			CommitFormat:  "task {task_id}: {title}",
+			Coordinator: CoordinatorConfig{
+				Enabled: false,
+			},
 		},
 		Archival: ArchivalConfig{
 			AutoArchive: false,
@@ -280,6 +292,11 @@ func applyDefaults(cfg *Config) {
 
 	if cfg.Execution.CommitFormat == "" {
 		cfg.Execution.CommitFormat = defaults.Execution.CommitFormat
+	}
+
+	// Apply coordinator defaults
+	if cfg.Execution.Coordinator.Enabled && cfg.Execution.Coordinator.MaxSubtasks == 0 {
+		cfg.Execution.Coordinator.MaxSubtasks = 5
 	}
 
 	// Set storage backend default to 'jsonl' if empty

@@ -453,3 +453,199 @@ func TestLoadNewFormatConfig(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) > len(substr) && s[0:len(substr)] == substr || len(s) > 0)
 }
+
+// Tests for CoordinatorConfig defaults
+
+func TestCoordinatorConfig_EnabledDefaultsMaxSubtasks(t *testing.T) {
+	// Test that MaxSubtasks defaults to 5 when Enabled is true and MaxSubtasks is 0
+	tempDir, err := os.MkdirTemp("", "devloop-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	configPath := filepath.Join(tempDir, "config.json")
+
+	coordinatorJSON := `{
+		"version": "1.0",
+		"project": {"name": "test", "path": "/tmp", "tech_stack": "Go"},
+		"verification": {"command": "go test", "timeout_seconds": 300},
+		"cli": {"agents": {"claude": {"tool": "claude", "models": {"simple": "claude-haiku"}}}},
+		"execution": {
+			"max_attempts": 2,
+			"coordinator": {
+				"enabled": true,
+				"agent": "claude",
+				"model": "claude-opus-4-6",
+				"max_subtasks": 0
+			}
+		}
+	}`
+
+	if err := os.WriteFile(configPath, []byte(coordinatorJSON), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if !cfg.Execution.Coordinator.Enabled {
+		t.Errorf("Expected coordinator enabled to be true, got %v", cfg.Execution.Coordinator.Enabled)
+	}
+
+	if cfg.Execution.Coordinator.MaxSubtasks != 5 {
+		t.Errorf("Expected max_subtasks to default to 5, got %d", cfg.Execution.Coordinator.MaxSubtasks)
+	}
+
+	if cfg.Execution.Coordinator.Agent != "claude" {
+		t.Errorf("Expected agent to be 'claude', got '%s'", cfg.Execution.Coordinator.Agent)
+	}
+
+	if cfg.Execution.Coordinator.Model != "claude-opus-4-6" {
+		t.Errorf("Expected model to be 'claude-opus-4-6', got '%s'", cfg.Execution.Coordinator.Model)
+	}
+}
+
+func TestCoordinatorConfig_PreservesCustomMaxSubtasks(t *testing.T) {
+	// Test that custom MaxSubtasks values are preserved
+	tempDir, err := os.MkdirTemp("", "devloop-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	configPath := filepath.Join(tempDir, "config.json")
+
+	coordinatorJSON := `{
+		"version": "1.0",
+		"project": {"name": "test", "path": "/tmp", "tech_stack": "Go"},
+		"verification": {"command": "go test", "timeout_seconds": 300},
+		"cli": {"agents": {"claude": {"tool": "claude", "models": {"simple": "claude-haiku"}}}},
+		"execution": {
+			"max_attempts": 2,
+			"coordinator": {
+				"enabled": true,
+				"agent": "claude",
+				"model": "claude-opus-4-6",
+				"max_subtasks": 10
+			}
+		}
+	}`
+
+	if err := os.WriteFile(configPath, []byte(coordinatorJSON), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.Execution.Coordinator.MaxSubtasks != 10 {
+		t.Errorf("Expected max_subtasks to remain 10, got %d", cfg.Execution.Coordinator.MaxSubtasks)
+	}
+}
+
+func TestCoordinatorConfig_DisabledDoesNotDefaultMaxSubtasks(t *testing.T) {
+	// Test that MaxSubtasks doesn't get defaulted when Enabled is false
+	tempDir, err := os.MkdirTemp("", "devloop-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	configPath := filepath.Join(tempDir, "config.json")
+
+	coordinatorJSON := `{
+		"version": "1.0",
+		"project": {"name": "test", "path": "/tmp", "tech_stack": "Go"},
+		"verification": {"command": "go test", "timeout_seconds": 300},
+		"cli": {"agents": {"claude": {"tool": "claude", "models": {"simple": "claude-haiku"}}}},
+		"execution": {
+			"max_attempts": 2,
+			"coordinator": {
+				"enabled": false,
+				"agent": "claude",
+				"model": "claude-opus-4-6",
+				"max_subtasks": 0
+			}
+		}
+	}`
+
+	if err := os.WriteFile(configPath, []byte(coordinatorJSON), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.Execution.Coordinator.Enabled {
+		t.Errorf("Expected coordinator enabled to be false, got %v", cfg.Execution.Coordinator.Enabled)
+	}
+
+	if cfg.Execution.Coordinator.MaxSubtasks != 0 {
+		t.Errorf("Expected max_subtasks to remain 0 when disabled, got %d", cfg.Execution.Coordinator.MaxSubtasks)
+	}
+}
+
+func TestCoordinatorConfig_BackwardCompatibility(t *testing.T) {
+	// Test that old configs without coordinator field still load correctly
+	tempDir, err := os.MkdirTemp("", "devloop-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	configPath := filepath.Join(tempDir, "config.json")
+
+	oldJSON := `{
+		"version": "1.0",
+		"project": {"name": "test", "path": "/tmp", "tech_stack": "Go"},
+		"verification": {"command": "go test", "timeout_seconds": 300},
+		"cli": {"agents": {"claude": {"tool": "claude", "models": {"simple": "claude-haiku"}}}},
+		"execution": {
+			"max_attempts": 2,
+			"halt_on_failure": true,
+			"auto_commit": true
+		}
+	}`
+
+	if err := os.WriteFile(configPath, []byte(oldJSON), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg == nil {
+		t.Fatal("LoadConfig should return valid config")
+	}
+
+	// Verify the old fields still work
+	if cfg.Execution.MaxAttempts != 2 {
+		t.Errorf("Expected max_attempts 2, got %d", cfg.Execution.MaxAttempts)
+	}
+
+	if !cfg.Execution.HaltOnFailure {
+		t.Errorf("Expected halt_on_failure to be true")
+	}
+
+	if !cfg.Execution.AutoCommit {
+		t.Errorf("Expected auto_commit to be true")
+	}
+
+	// Verify coordinator field has zero values (not set)
+	if cfg.Execution.Coordinator.Enabled {
+		t.Errorf("Expected coordinator enabled to be false for old config")
+	}
+
+	if cfg.Execution.Coordinator.MaxSubtasks != 0 {
+		t.Errorf("Expected max_subtasks to be 0 for old config, got %d", cfg.Execution.Coordinator.MaxSubtasks)
+	}
+}
