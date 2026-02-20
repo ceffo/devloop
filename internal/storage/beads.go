@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ceffo/devloop/internal/config"
@@ -22,8 +23,10 @@ var execCommandContextFunc = exec.CommandContext
 
 // BeadsStore manages interactions with the bd binary
 type BeadsStore struct {
-	cfg    *config.Config
-	bdPath string
+	cfg        *config.Config
+	bdPath     string
+	mu         sync.Mutex
+	claimedIDs map[string]bool // beads hash IDs currently claimed (in_progress)
 }
 
 // NewBeadsStore creates a new BeadsStore instance and verifies the bd binary is available
@@ -35,8 +38,9 @@ func NewBeadsStore(cfg *config.Config) (*BeadsStore, error) {
 	}
 
 	return &BeadsStore{
-		cfg:    cfg,
-		bdPath: bdPath,
+		cfg:        cfg,
+		bdPath:     bdPath,
+		claimedIDs: make(map[string]bool),
 	}, nil
 }
 
@@ -397,9 +401,13 @@ func (s *BeadsStore) QueryReadyTasks(ctx context.Context) ([]*Task, error) {
 }
 
 // UpdateTask dispatches the status transition to the appropriate bd command(s).
-//   - in_progress: bd update <id> --claim --json (atomic claim)
+//   - in_progress: bd update <id> --claim --json (atomic claim; no-op if already claimed)
 //   - completed:   bd close <id> --reason 'Verification passed'
 //   - failed:      bd close <id> --reason 'Verification failed' + bd label add <id> failed
+//
+// The in_progress case is idempotent: calling it on an already-claimed task is a no-op.
+// This prevents the executor's mid-loop state saves from issuing a double-claim, which
+// would hang indefinitely in beads.
 //
 // All bd calls use a 10-second timeout.
 func (s *BeadsStore) UpdateTask(ctx context.Context, task *Task) error {
@@ -410,15 +418,37 @@ func (s *BeadsStore) UpdateTask(ctx context.Context, task *Task) error {
 
 	switch task.Status {
 	case "in_progress":
+		// Skip if already in_progress — re-claiming is a no-op and avoids a second bd call.
+		// We use --status rather than --claim because --claim triggers federation sync which
+		// can hang indefinitely when no remote is configured.
+		s.mu.Lock()
+		alreadyClaimed := s.claimedIDs[beadsID]
+		if !alreadyClaimed {
+			s.claimedIDs[beadsID] = true
+		}
+		s.mu.Unlock()
+
+		if alreadyClaimed {
+			return nil
+		}
+
 		claimCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		cmd := execCommandContextFunc(claimCtx, s.bdPath, "update", beadsID, "--claim", "--json")
+		cmd := execCommandContextFunc(claimCtx, s.bdPath, "update", beadsID, "--status", "in_progress", "--json")
 		out, cmdErr := cmd.CombinedOutput()
 		cancel()
 		if cmdErr != nil {
-			return fmt.Errorf("bd update --claim %q failed: %w (output: %s)", beadsID, cmdErr, strings.TrimSpace(string(out)))
+			// Undo the claim tracking on failure so it can be retried.
+			s.mu.Lock()
+			delete(s.claimedIDs, beadsID)
+			s.mu.Unlock()
+			return fmt.Errorf("bd update --status in_progress %q failed: %w (output: %s)", beadsID, cmdErr, strings.TrimSpace(string(out)))
 		}
 
 	case "completed":
+		s.mu.Lock()
+		delete(s.claimedIDs, beadsID)
+		s.mu.Unlock()
+
 		closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		cmd := execCommandContextFunc(closeCtx, s.bdPath, "close", beadsID, "--reason", "Verification passed")
 		out, cmdErr := cmd.CombinedOutput()
@@ -428,6 +458,10 @@ func (s *BeadsStore) UpdateTask(ctx context.Context, task *Task) error {
 		}
 
 	case "failed":
+		s.mu.Lock()
+		delete(s.claimedIDs, beadsID)
+		s.mu.Unlock()
+
 		closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		cmd := execCommandContextFunc(closeCtx, s.bdPath, "close", beadsID, "--reason", "Verification failed")
 		out, cmdErr := cmd.CombinedOutput()
@@ -493,11 +527,11 @@ func (s *BeadsStore) SetMigrationStatus(ctx context.Context, beadsID string, dev
 
 	case "in_progress":
 		claimCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		cmd := execCommandContextFunc(claimCtx, s.bdPath, "update", beadsID, "--claim", "--json")
+		cmd := execCommandContextFunc(claimCtx, s.bdPath, "update", beadsID, "--status", "in_progress", "--json")
 		out, err := cmd.CombinedOutput()
 		cancel()
 		if err != nil {
-			return fmt.Errorf("bd update --claim %q failed: %w (output: %s)", beadsID, err, strings.TrimSpace(string(out)))
+			return fmt.Errorf("bd update --status in_progress %q failed: %w (output: %s)", beadsID, err, strings.TrimSpace(string(out)))
 		}
 		return nil
 

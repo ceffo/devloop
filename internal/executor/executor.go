@@ -373,8 +373,12 @@ func executeTask(ctx context.Context, cfg *config.Config, store storage.TaskStor
 	// Track previous error for retry prompts
 	var previousError string
 
-	// Attempt execution up to MaxAttempts times
-	for attemptNum := 1; attemptNum <= task.Metadata.MaxAttempts; attemptNum++ {
+	// Attempt execution up to MaxAttempts times; fall back to config default when unset.
+	maxAttempts := task.Metadata.MaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = cfg.Execution.MaxAttempts
+	}
+	for attemptNum := 1; attemptNum <= maxAttempts; attemptNum++ {
 		// Check for interrupts
 		select {
 		case <-ctx.Done():

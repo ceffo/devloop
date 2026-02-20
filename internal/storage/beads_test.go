@@ -102,8 +102,9 @@ func contains(str, substr string) bool {
 // newTestStore returns a BeadsStore with a fake bdPath, bypassing LookPath.
 func newTestStore() *BeadsStore {
 	return &BeadsStore{
-		cfg:    &config.Config{},
-		bdPath: "/usr/local/bin/bd",
+		cfg:        &config.Config{},
+		bdPath:     "/usr/local/bin/bd",
+		claimedIDs: make(map[string]bool),
 	}
 }
 
@@ -842,7 +843,7 @@ func TestUpdateTask_InProgress_ClaimsCalled(t *testing.T) {
 		t.Fatalf("UpdateTask in_progress failed: %v", err)
 	}
 
-	// Verify bd update --claim --json was called
+	// Verify bd update --status in_progress --json was called
 	if len(capturedArgs) < 1 {
 		t.Fatal("expected at least one exec call")
 	}
@@ -850,8 +851,11 @@ func TestUpdateTask_InProgress_ClaimsCalled(t *testing.T) {
 	if !contains(first, "update") {
 		t.Errorf("expected 'update' in first call args: %v", capturedArgs[0])
 	}
-	if !contains(first, "--claim") {
-		t.Errorf("expected '--claim' in first call args: %v", capturedArgs[0])
+	if !contains(first, "--status") {
+		t.Errorf("expected '--status' in first call args: %v", capturedArgs[0])
+	}
+	if !contains(first, "in_progress") {
+		t.Errorf("expected 'in_progress' in first call args: %v", capturedArgs[0])
 	}
 	if !contains(first, "--json") {
 		t.Errorf("expected '--json' in first call args: %v", capturedArgs[0])
@@ -860,9 +864,35 @@ func TestUpdateTask_InProgress_ClaimsCalled(t *testing.T) {
 		t.Errorf("expected beads ID 'bd-x7f3' in first call args: %v", capturedArgs[0])
 	}
 
-	// Only one bd call for in_progress (claim)
+	// Only one bd call for in_progress
 	if len(capturedArgs) != 1 {
 		t.Errorf("expected exactly 1 exec call for in_progress, got %d", len(capturedArgs))
+	}
+}
+
+func TestUpdateTask_InProgress_IdempotentDoesNotReClaim(t *testing.T) {
+	store := newTestStore()
+
+	bdCallCount := 0
+	orig := execCommandContextFunc
+	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		bdCallCount++
+		return exec.CommandContext(ctx, "sh", "-c", "true")
+	}
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{ID: "bd-x7f3", Status: "in_progress"}
+
+	// First call should issue bd update --status in_progress; second call should be a no-op.
+	if err := store.UpdateTask(context.Background(), task); err != nil {
+		t.Fatalf("first UpdateTask failed: %v", err)
+	}
+	if err := store.UpdateTask(context.Background(), task); err != nil {
+		t.Fatalf("second UpdateTask failed: %v", err)
+	}
+
+	if bdCallCount != 1 {
+		t.Errorf("expected exactly 1 bd call (second is no-op), got %d", bdCallCount)
 	}
 }
 

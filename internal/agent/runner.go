@@ -59,6 +59,9 @@ func runCLIAgent(binary, header, model, prompt, logPath string, buildArgs func(m
 	fmt.Fprintf(logFile, "=== Output ===\n")
 
 	cmd := exec.Command(binary, buildArgs(model, prompt)...)
+	// Unset CLAUDECODE so the subprocess is not treated as a nested Claude Code session.
+	// Claude Code blocks launch when CLAUDECODE is set in the environment.
+	cmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 
 	var runErr error
 	if outputFn != nil {
@@ -147,6 +150,19 @@ func (c *CopilotRunner) RunWithOutput(model, prompt, logPath string, outputFn Ou
 	return runCLIAgent("copilot", "Copilot", model, prompt, logPath, func(model, prompt string) []string {
 		return []string{"--model", model, "--allow-all", "-p", prompt}
 	}, outputFn)
+}
+
+// filterEnv returns os.Environ() with any variables whose name matches key removed.
+func filterEnv(env []string, key string) []string {
+	prefix := key + "="
+	filtered := make([]string, 0, len(env))
+	for _, e := range env {
+		if len(e) >= len(prefix) && e[:len(prefix)] == prefix {
+			continue
+		}
+		filtered = append(filtered, e)
+	}
+	return filtered
 }
 
 // NewAgentRunner creates an appropriate Runner based on the tool name

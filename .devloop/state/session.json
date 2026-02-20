@@ -1,88 +1,21 @@
 {
-  "id": "4c4f5837-1d60-4a0d-99cd-b2dd1171c0e9",
-  "started_at": "2026-02-19T19:07:11.857437438-05:00",
-  "last_checkpoint": "DEV-56",
-  "tasks_completed": [
-    "DEV-25",
-    "DEV-27",
-    "DEV-42",
-    "DEV-49",
-    "DEV-26",
-    "DEV-30",
-    "DEV-39",
-    "DEV-43",
-    "DEV-47",
-    "DEV-48",
-    "DEV-50",
-    "DEV-28",
-    "DEV-31",
-    "DEV-32",
-    "DEV-33",
-    "DEV-44",
-    "DEV-54",
-    "DEV-57",
-    "DEV-35",
-    "DEV-36",
-    "DEV-37",
-    "DEV-45",
-    "DEV-29",
-    "DEV-34",
-    "DEV-38",
-    "DEV-46",
-    "DEV-51",
-    "DEV-41",
-    "DEV-40",
-    "DEV-52",
-    "DEV-53",
-    "DEV-55",
-    "DEV-56"
-  ],
-  "tasks_failed": [
-    "DEV-29",
-    "DEV-34"
-  ],
-  "agent_name": "copilot",
+  "id": "1180b00e-8f33-4b8b-b7e0-350f72a7804f",
+  "started_at": "2026-02-20T12:22:59.948549135-05:00",
+  "last_checkpoint": "",
+  "tasks_completed": [],
+  "tasks_failed": [],
+  "agent_name": "claude",
   "model_map": {
-    "complex": "claude-sonnet-4.6",
-    "moderate": "claude-sonnet-4.6",
-    "simple": "claude-haiku-4.5"
+    "complex": "opus",
+    "moderate": "sonnet",
+    "simple": "haiku"
   },
   "task_snapshot": [
     {
-      "id": "DEV-35",
-      "title": "Implement BeadsStore read operations (GetTask, LoadTasks, QueryTasks)",
-      "status": "pending",
-      "complexity": "moderate"
-    },
-    {
-      "id": "DEV-36",
-      "title": "Implement BeadsStore.UpdateTask with claim semantics",
-      "status": "pending",
-      "complexity": "moderate"
-    },
-    {
-      "id": "DEV-37",
-      "title": "Implement BeadsStore.QueryReadyTasks",
+      "id": "devloop-5p8",
+      "title": "add devloop version command",
       "status": "pending",
       "complexity": "simple"
-    },
-    {
-      "id": "DEV-45",
-      "title": "Add knowledge context injection to task prompt",
-      "status": "pending",
-      "complexity": "moderate"
-    },
-    {
-      "id": "DEV-29",
-      "title": "Update all callers to use TaskStore interface",
-      "status": "failed",
-      "complexity": "moderate"
-    },
-    {
-      "id": "DEV-34",
-      "title": "Implement BeadsStore.SaveTask with full creation flow",
-      "status": "pending",
-      "complexity": "complex"
     }
   ]
 }
