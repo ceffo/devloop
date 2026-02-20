@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/knowledge"
 	"github.com/ceffo/devloop/internal/processor"
 	"github.com/ceffo/devloop/internal/storage"
 )
@@ -280,7 +281,7 @@ func TestRenderTaskPrompt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := RenderTaskPrompt(tt.cfg, tt.task, tt.attempt, tt.prevError)
+			result, err := RenderTaskPrompt(tt.cfg, tt.task, tt.attempt, tt.prevError, &knowledge.NoopClient{})
 
 			if tt.expectError && err == nil {
 				t.Errorf("expected error but got none")
@@ -309,6 +310,126 @@ func TestRenderTaskPrompt(t *testing.T) {
 		})
 	}
 }
+
+// TestRenderTaskPromptKnowledgeSections tests knowledge context injection sections
+func TestRenderTaskPromptKnowledgeSections(t *testing.T) {
+	baseCfg := func() *config.Config {
+		return &config.Config{
+			Project: config.ProjectConfig{
+				Name:       "kproject",
+				Path:       "/k/project",
+				TechStack:  "Go",
+				MainBranch: "main",
+			},
+			Verification: config.VerificationConfig{Command: "go test ./..."},
+		}
+	}
+	baseTask := &storage.Task{
+		ID:          "K-1",
+		Title:       "Knowledge task",
+		Complexity:  "simple",
+		Description: "A task with knowledge",
+		Metadata:    storage.TaskMetadata{MaxAttempts: 1},
+	}
+
+	t.Run("mulch context appears when client returns non-empty string", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Knowledge.InjectOnExecute = true
+
+		mockClient := &mockKnowledgeClient{primeOutput: "## Architecture\nService uses hexagonal architecture.\n"}
+		result, err := RenderTaskPrompt(cfg, baseTask, 1, "", mockClient)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result, "Project Expertise") {
+			t.Errorf("expected 'Project Expertise' section when MulchContext is set")
+		}
+		if !strings.Contains(result, "hexagonal architecture") {
+			t.Errorf("expected mulch context content in prompt")
+		}
+	})
+
+	t.Run("mulch context absent when InjectOnExecute is false", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Knowledge.InjectOnExecute = false
+
+		mockClient := &mockKnowledgeClient{primeOutput: "some context"}
+		result, err := RenderTaskPrompt(cfg, baseTask, 1, "", mockClient)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(result, "Project Expertise") {
+			t.Errorf("should not include 'Project Expertise' when InjectOnExecute is false")
+		}
+	})
+
+	t.Run("mulch context absent when client returns empty string", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Knowledge.InjectOnExecute = true
+
+		result, err := RenderTaskPrompt(cfg, baseTask, 1, "", &knowledge.NoopClient{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(result, "Project Expertise") {
+			t.Errorf("should not include 'Project Expertise' when Prime returns empty string")
+		}
+	})
+
+	t.Run("knowledge recording section appears when domains configured", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Knowledge.Domains = []string{"architecture", "patterns"}
+
+		result, err := RenderTaskPrompt(cfg, baseTask, 1, "", &knowledge.NoopClient{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result, "Knowledge Recording") {
+			t.Errorf("expected 'Knowledge Recording' section when domains are configured")
+		}
+		if !strings.Contains(result, "architecture") {
+			t.Errorf("expected domain 'architecture' in prompt")
+		}
+		if !strings.Contains(result, "patterns") {
+			t.Errorf("expected domain 'patterns' in prompt")
+		}
+	})
+
+	t.Run("knowledge recording section absent when no domains", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Knowledge.Domains = nil
+
+		result, err := RenderTaskPrompt(cfg, baseTask, 1, "", &knowledge.NoopClient{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(result, "Knowledge Recording") {
+			t.Errorf("should not include 'Knowledge Recording' when no domains configured")
+		}
+	})
+
+	t.Run("joinDomains formats multiple domains with comma separation", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Knowledge.Domains = []string{"domain-a", "domain-b", "domain-c"}
+
+		result, err := RenderTaskPrompt(cfg, baseTask, 1, "", &knowledge.NoopClient{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result, "domain-a, domain-b, domain-c") {
+			t.Errorf("expected domains joined with ', ' separator")
+		}
+	})
+}
+
+// mockKnowledgeClient is a test double for knowledge.Client.
+type mockKnowledgeClient struct {
+	primeOutput string
+}
+
+func (m *mockKnowledgeClient) Prime() string      { return m.primeOutput }
+func (m *mockKnowledgeClient) Record(_ any) error { return nil }
+func (m *mockKnowledgeClient) IsEnabled() bool    { return true }
 
 func TestRenderCoordinatorPrompt(t *testing.T) {
 	tests := []struct {
@@ -586,7 +707,7 @@ func TestRenderTaskPromptOutput(t *testing.T) {
 		},
 	}
 
-	result, err := RenderTaskPrompt(cfg, task, 1, "")
+	result, err := RenderTaskPrompt(cfg, task, 1, "", &knowledge.NoopClient{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

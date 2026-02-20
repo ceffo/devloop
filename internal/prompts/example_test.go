@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/knowledge"
 	"github.com/ceffo/devloop/internal/processor"
 	"github.com/ceffo/devloop/internal/storage"
 )
@@ -80,7 +81,7 @@ func ExampleRenderTaskPrompt() {
 		},
 	}
 
-	result, err := RenderTaskPrompt(cfg, task, 1, "")
+	result, err := RenderTaskPrompt(cfg, task, 1, "", &knowledge.NoopClient{})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -91,7 +92,7 @@ func ExampleRenderTaskPrompt() {
 	fmt.Printf("Length: %d characters\n", len(result))
 	// Output:
 	// Task prompt rendered successfully
-	// Length: 788 characters
+	// Length: 792 characters
 }
 
 // ExampleRenderTaskPrompt_withError demonstrates task prompt with previous error
@@ -125,7 +126,7 @@ func ExampleRenderTaskPrompt_withError() {
 
 	prevError := "AssertionError: Expected 401, got 200"
 
-	result, err := RenderTaskPrompt(cfg, task, 2, prevError)
+	result, err := RenderTaskPrompt(cfg, task, 2, prevError, &knowledge.NoopClient{})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return

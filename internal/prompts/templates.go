@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/knowledge"
 	"github.com/ceffo/devloop/internal/processor"
 	"github.com/ceffo/devloop/internal/storage"
 )
@@ -101,6 +102,15 @@ Please analyze the error and correct the implementation.
 {{.CustomInstructions}}
 {{end}}
 
+{{if .MulchContext}}## Project Expertise
+{{.MulchContext}}
+{{end}}
+
+{{if .KnowledgeDomains}}## Knowledge Recording
+After completing this task, record key learnings to the knowledge base.
+Relevant domains: {{joinDomains .KnowledgeDomains}}
+{{end}}
+
 ## Your Task
 Implement this task according to the description and acceptance criteria.
 Ensure all criteria are met and the verification command will pass.`
@@ -130,6 +140,8 @@ type TaskPromptData struct {
 	VerificationCommand string
 	PreviousError       string
 	CustomInstructions  string
+	MulchContext        string
+	KnowledgeDomains    []string
 }
 
 // RenderTodoPrompt generates a prompt for processing TODO items into tasks
@@ -264,7 +276,7 @@ func RenderCoordinatorPrompt(cfg *config.Config, task *storage.Task) (string, er
 }
 
 // RenderTaskPrompt generates a prompt for executing a specific task
-func RenderTaskPrompt(cfg *config.Config, task *storage.Task, attempt int, prevError string) (string, error) {
+func RenderTaskPrompt(cfg *config.Config, task *storage.Task, attempt int, prevError string, client knowledge.Client) (string, error) {
 	// Build acceptance criteria list
 	criteria := task.AcceptanceCriteria
 	if criteria == nil {
@@ -273,6 +285,12 @@ func RenderTaskPrompt(cfg *config.Config, task *storage.Task, attempt int, prevE
 
 	// Get previous error if provided
 	previousError := strings.TrimSpace(prevError)
+
+	// Fetch knowledge context when injection is enabled
+	var mulchContext string
+	if cfg.Knowledge.InjectOnExecute && client != nil {
+		mulchContext = client.Prime()
+	}
 
 	data := TaskPromptData{
 		ProjectName:         cfg.Project.Name,
@@ -289,9 +307,17 @@ func RenderTaskPrompt(cfg *config.Config, task *storage.Task, attempt int, prevE
 		VerificationCommand: cfg.Verification.Command,
 		PreviousError:       previousError,
 		CustomInstructions:  cfg.Prompts.CustomInstructions,
+		MulchContext:        mulchContext,
+		KnowledgeDomains:    cfg.Knowledge.Domains,
 	}
 
-	tmpl, err := template.New("task").Parse(TaskExecutionPrompt)
+	funcMap := template.FuncMap{
+		"joinDomains": func(domains []string) string {
+			return strings.Join(domains, ", ")
+		},
+	}
+
+	tmpl, err := template.New("task").Funcs(funcMap).Parse(TaskExecutionPrompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse task prompt template: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ceffo/devloop/internal/agent"
 	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/knowledge"
 	"github.com/ceffo/devloop/internal/prompts"
 	"github.com/ceffo/devloop/internal/storage"
 	"github.com/ceffo/devloop/internal/ui"
@@ -116,6 +117,9 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 		return fmt.Errorf("failed to create agent runner: %w", err)
 	}
 
+	// Initialize knowledge client
+	knowledgeClient := knowledge.NewClient(cfg.Knowledge.Backend)
+
 	// Initialize TUI notifier (falls back to plain text for non-TTY)
 	notifier := NewNotifier()
 	notifier.SetCancelFunc(cancel)
@@ -179,7 +183,7 @@ func ExecuteDevLoop(ctx context.Context, cfg *config.Config, taskID string, cont
 			taskNumber, task.ID, task.Title, task.Complexity, model, selectedAgentName))
 
 		// Execute task with retries, passing notifier for status updates
-		success, err := executeTask(ctx, cfg, store, agentRunner, task, model, notifier, sessionStats)
+		success, err := executeTask(ctx, cfg, store, agentRunner, task, model, notifier, sessionStats, knowledgeClient)
 		if err != nil {
 			notifier.TaskFailed(task.ID)
 			notifier.Log(fmt.Sprintf("Task %s error: %v", task.ID, err))
@@ -328,7 +332,7 @@ func getReadyTasksForExecution(store *storage.Storage, filter storage.Filter, ta
 // executeTask executes a single task with retry logic
 // Returns (success, error)
 // sessionStats is updated in place and UsageStatsUpdate is called after each agent call.
-func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.Runner, task *storage.Task, model string, notifier Notifier, sessionStats *ui.UsageStats) (bool, error) {
+func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage, runner agent.Runner, task *storage.Task, model string, notifier Notifier, sessionStats *ui.UsageStats, knowledgeClient knowledge.Client) (bool, error) {
 	// Mark task as in progress
 	task.Status = "in_progress"
 	task.Metadata.UpdatedAt = time.Now()
@@ -352,7 +356,7 @@ func executeTask(ctx context.Context, cfg *config.Config, store *storage.Storage
 		notifier.Log(fmt.Sprintf("  Attempt %d/%d for %s...", attemptNum, task.Metadata.MaxAttempts, task.ID))
 
 		// Generate prompt with context
-		prompt, err := prompts.RenderTaskPrompt(cfg, task, attemptNum, previousError)
+		prompt, err := prompts.RenderTaskPrompt(cfg, task, attemptNum, previousError, knowledgeClient)
 		if err != nil {
 			return false, fmt.Errorf("failed to generate prompt: %w", err)
 		}

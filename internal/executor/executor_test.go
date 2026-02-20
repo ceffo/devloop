@@ -9,6 +9,7 @@ import (
 
 	"github.com/ceffo/devloop/internal/agent"
 	"github.com/ceffo/devloop/internal/config"
+	"github.com/ceffo/devloop/internal/knowledge"
 	"github.com/ceffo/devloop/internal/storage"
 	"github.com/ceffo/devloop/internal/ui"
 )
@@ -127,7 +128,7 @@ func TestExecuteTaskSuccess(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier(), &ui.UsageStats{})
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier(), &ui.UsageStats{}, &knowledge.NoopClient{})
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)
@@ -223,7 +224,7 @@ func TestExecuteTaskRetry(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier(), &ui.UsageStats{})
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier(), &ui.UsageStats{}, &knowledge.NoopClient{})
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)
@@ -316,7 +317,7 @@ func TestExecuteTaskAgentError(t *testing.T) {
 
 	// Execute task
 	ctx := context.Background()
-	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier(), &ui.UsageStats{})
+	success, err := executeTask(ctx, cfg, store, runner, task, "claude-haiku-4-5-20251001", newPlainNotifier(), &ui.UsageStats{}, &knowledge.NoopClient{})
 
 	if err != nil {
 		t.Fatalf("executeTask returned error: %v", err)
@@ -452,7 +453,7 @@ func TestExecuteTaskContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	success, err := executeTask(ctx, cfg, store, runner, task, "test-model", newPlainNotifier(), &ui.UsageStats{})
+	success, err := executeTask(ctx, cfg, store, runner, task, "test-model", newPlainNotifier(), &ui.UsageStats{}, &knowledge.NoopClient{})
 
 	if err != nil {
 		t.Fatalf("executeTask returned unexpected error: %v", err)
