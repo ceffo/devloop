@@ -665,3 +665,131 @@ func TestQueryTasks_IDSorting(t *testing.T) {
 		}
 	}
 }
+
+func TestNewTaskStore_JSONLBackend(t *testing.T) {
+	cfg, tmpDir := createTestConfig(t)
+	cfg.Storage.Backend = "jsonl"
+
+	store, err := NewTaskStore(cfg)
+	if err != nil {
+		t.Fatalf("NewTaskStore with 'jsonl' backend should not error: %v", err)
+	}
+
+	if store == nil {
+		t.Fatal("NewTaskStore returned nil for 'jsonl' backend")
+	}
+
+	// Verify it's a JSONLStore
+	jsonlStore, ok := store.(*JSONLStore)
+	if !ok {
+		t.Errorf("Expected *JSONLStore, got %T", store)
+	}
+
+	// Verify it's properly initialized
+	if jsonlStore.cfg != cfg {
+		t.Error("Config not properly stored in JSONLStore")
+	}
+
+	expectedTasksDir := filepath.Join(tmpDir, ".devloop")
+	if jsonlStore.tasksDir != expectedTasksDir {
+		t.Errorf("Expected tasksDir %s, got %s", expectedTasksDir, jsonlStore.tasksDir)
+	}
+}
+
+func TestNewTaskStore_EmptyBackend(t *testing.T) {
+	cfg, tmpDir := createTestConfig(t)
+	cfg.Storage.Backend = ""
+
+	store, err := NewTaskStore(cfg)
+	if err != nil {
+		t.Fatalf("NewTaskStore with empty backend should not error: %v", err)
+	}
+
+	if store == nil {
+		t.Fatal("NewTaskStore returned nil for empty backend")
+	}
+
+	// Verify it's a JSONLStore (default)
+	jsonlStore, ok := store.(*JSONLStore)
+	if !ok {
+		t.Errorf("Expected *JSONLStore for empty backend, got %T", store)
+	}
+
+	// Verify it's properly initialized
+	if jsonlStore.cfg != cfg {
+		t.Error("Config not properly stored in JSONLStore")
+	}
+
+	expectedTasksDir := filepath.Join(tmpDir, ".devloop")
+	if jsonlStore.tasksDir != expectedTasksDir {
+		t.Errorf("Expected tasksDir %s, got %s", expectedTasksDir, jsonlStore.tasksDir)
+	}
+}
+
+func TestNewTaskStore_BeadsBackend(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	cfg.Storage.Backend = "beads"
+
+	store, err := NewTaskStore(cfg)
+
+	// Should return an error
+	if err == nil {
+		t.Fatal("NewTaskStore with 'beads' backend should return an error")
+	}
+
+	// Should return nil store
+	if store != nil {
+		t.Errorf("NewTaskStore should return nil store for beads backend, got %v", store)
+	}
+
+	// Verify error message mentions "not yet implemented"
+	if err.Error() != "beads backend is not yet implemented" {
+		t.Errorf("Expected error message 'beads backend is not yet implemented', got %q", err.Error())
+	}
+}
+
+func TestNewTaskStore_UnknownBackend(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	cfg.Storage.Backend = "unknown"
+
+	store, err := NewTaskStore(cfg)
+
+	// Should return an error
+	if err == nil {
+		t.Fatal("NewTaskStore with unknown backend should return an error")
+	}
+
+	// Should return nil store
+	if store != nil {
+		t.Errorf("NewTaskStore should return nil store for unknown backend, got %v", store)
+	}
+
+	// Verify error message is descriptive
+	expectedMsg := "unknown storage backend: \"unknown\""
+	if err.Error() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+func TestNewTaskStore_VirtualBackend(t *testing.T) {
+	cfg, _ := createTestConfig(t)
+	cfg.Storage.Backend = "virtual"
+
+	store, err := NewTaskStore(cfg)
+
+	// Should return an error
+	if err == nil {
+		t.Fatal("NewTaskStore with 'virtual' backend should return an error")
+	}
+
+	// Should return nil store
+	if store != nil {
+		t.Errorf("NewTaskStore should return nil store for 'virtual' backend, got %v", store)
+	}
+
+	// Verify error message mentions the backend name
+	expectedMsg := "unknown storage backend: \"virtual\""
+	if err.Error() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
