@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -108,6 +109,13 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 
 	spinner.Stop()
+
+	// Initialize beads backend if configured
+	if cfg.Storage.Backend == "beads" {
+		if err := initBeadsBackend(cwd); err != nil {
+			fmt.Printf("Warning: %v\n", err)
+		}
+	}
 
 	// Success message
 	fmt.Println(ui.Success("devloop initialized successfully!"))
@@ -235,6 +243,33 @@ func createInitialConfig(name, path, techStack string) *config.Config {
 	}
 
 	return cfg
+}
+
+// initBeadsBackend checks for the bd binary and runs bd init in the project directory.
+// If bd is not found, it prints installation instructions.
+func initBeadsBackend(cwd string) error {
+	if _, err := exec.LookPath("bd"); err != nil {
+		fmt.Println("\nBeads storage backend selected, but 'bd' is not installed.")
+		fmt.Println("Install bd using one of the following methods:")
+		fmt.Println("  go install  github.com/beads-db/bd@latest")
+		fmt.Println("  npm install -g @beads-db/bd")
+		fmt.Println("  brew install beads-db/tap/bd")
+		fmt.Println("\nAfter installing, run 'bd init' in your project directory.")
+		fmt.Println("Tip: 'bd init --stealth' hides the .beads directory from git.")
+		return fmt.Errorf("bd not found in PATH")
+	}
+
+	fmt.Println("\nInitializing Beads storage backend...")
+	cmd := exec.Command("bd", "init")
+	cmd.Dir = cwd
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("bd init failed: %w", err)
+	}
+
+	fmt.Println("Tip: use 'bd init --stealth' to initialize in stealth mode (hides .beads directory from git)")
+	return nil
 }
 
 // detectVerificationCommand attempts to detect an appropriate verification command

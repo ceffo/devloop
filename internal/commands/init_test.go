@@ -230,6 +230,25 @@ func TestCreateInitialConfig(t *testing.T) {
 	}
 }
 
+func TestInitBeadsBackend_BdNotFound(t *testing.T) {
+	// Override PATH so bd is not found
+	t.Setenv("PATH", "")
+
+	tempDir, err := os.MkdirTemp("", "devloop-beads-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	err = initBeadsBackend(tempDir)
+	if err == nil {
+		t.Fatal("expected error when bd is not in PATH, got nil")
+	}
+	if err.Error() != "bd not found in PATH" {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 // Helper function for string contains check
 func contains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
