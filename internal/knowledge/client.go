@@ -15,10 +15,14 @@ type Client interface {
 
 // NewClient creates a new knowledge client based on the provided backend configuration.
 // Returns a NoopClient when backend is empty or 'none'.
+// Returns a MulchClient when backend is 'mulch'.
 func NewClient(backend string) Client {
-	if backend == "" || backend == "none" {
+	switch backend {
+	case "mulch":
+		return NewMulchClient(0, "")
+	case "", "none":
+		return &NoopClient{}
+	default:
 		return &NoopClient{}
 	}
-	// For now, only noop client is implemented
-	return &NoopClient{}
 }
