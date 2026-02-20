@@ -1,5 +1,9 @@
 # Agent Instructions for devloop
 
+> **Deprecated:** This file is superseded by **`CLAUDE.md`** at the project root. All agent guidance, conventions, and workflow are now maintained there. This file is kept for historical reference only.
+
+---
+
 Shared guidance for AI agents (Claude, Copilot, etc.) working on the devloop project.
 
 ## Before Starting Work
