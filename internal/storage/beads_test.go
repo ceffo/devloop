@@ -732,6 +732,249 @@ func TestQueryTasks_CompletedMapsToClosedStatus(t *testing.T) {
 	}
 }
 
+// --- UpdateTask tests ---
+
+func TestUpdateTask_InProgress_ClaimsCalled(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	var capturedArgs [][]string
+	orig := execCommandContextFunc
+	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedArgs = append(capturedArgs, append([]string{name}, args...))
+		return exec.CommandContext(ctx, "sh", "-c", "true")
+	}
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:     "bd-x7f3",
+		Status: "in_progress",
+		Execution: TaskExecution{
+			TotalDuration: 30,
+		},
+	}
+
+	if err := store.UpdateTask(context.Background(), task); err != nil {
+		t.Fatalf("UpdateTask in_progress failed: %v", err)
+	}
+
+	// Verify bd update --claim --json was called
+	if len(capturedArgs) < 1 {
+		t.Fatal("expected at least one exec call")
+	}
+	first := joinArgs(capturedArgs[0])
+	if !contains(first, "update") {
+		t.Errorf("expected 'update' in first call args: %v", capturedArgs[0])
+	}
+	if !contains(first, "--claim") {
+		t.Errorf("expected '--claim' in first call args: %v", capturedArgs[0])
+	}
+	if !contains(first, "--json") {
+		t.Errorf("expected '--json' in first call args: %v", capturedArgs[0])
+	}
+	if !contains(first, "bd-x7f3") {
+		t.Errorf("expected beads ID 'bd-x7f3' in first call args: %v", capturedArgs[0])
+	}
+
+	// Verify sidecar was updated
+	sidecar, err := store.readSidecar("bd-x7f3")
+	if err != nil {
+		t.Fatalf("readSidecar failed: %v", err)
+	}
+	if sidecar == nil {
+		t.Fatal("expected sidecar to be written after UpdateTask")
+	}
+	if sidecar.Execution.TotalDuration != 30 {
+		t.Errorf("expected TotalDuration=30, got %d", sidecar.Execution.TotalDuration)
+	}
+}
+
+func TestUpdateTask_Completed_CloseCalled(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	var capturedArgs [][]string
+	orig := execCommandContextFunc
+	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedArgs = append(capturedArgs, append([]string{name}, args...))
+		return exec.CommandContext(ctx, "sh", "-c", "true")
+	}
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:     "bd-x7f3",
+		Status: "completed",
+		Results: &TaskResults{
+			VerificationOutput: "all tests passed",
+			CommitHash:         "abc123",
+		},
+	}
+
+	if err := store.UpdateTask(context.Background(), task); err != nil {
+		t.Fatalf("UpdateTask completed failed: %v", err)
+	}
+
+	// Verify bd close --reason 'Verification passed' was called
+	if len(capturedArgs) < 1 {
+		t.Fatal("expected at least one exec call")
+	}
+	first := joinArgs(capturedArgs[0])
+	if !contains(first, "close") {
+		t.Errorf("expected 'close' in first call args: %v", capturedArgs[0])
+	}
+	if !contains(first, "--reason") {
+		t.Errorf("expected '--reason' in first call args: %v", capturedArgs[0])
+	}
+	if !contains(first, "Verification passed") {
+		t.Errorf("expected 'Verification passed' in first call args: %v", capturedArgs[0])
+	}
+
+	// Only one bd call for completed
+	if len(capturedArgs) != 1 {
+		t.Errorf("expected exactly 1 exec call for completed, got %d", len(capturedArgs))
+	}
+
+	// Verify sidecar was updated with results
+	sidecar, err := store.readSidecar("bd-x7f3")
+	if err != nil {
+		t.Fatalf("readSidecar failed: %v", err)
+	}
+	if sidecar == nil {
+		t.Fatal("expected sidecar to be written after UpdateTask")
+	}
+	if sidecar.Results == nil {
+		t.Fatal("expected Results to be set in sidecar")
+	}
+	if sidecar.Results.CommitHash != "abc123" {
+		t.Errorf("expected CommitHash=abc123, got %q", sidecar.Results.CommitHash)
+	}
+}
+
+func TestUpdateTask_Failed_CloseAndLabelCalled(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	var capturedArgs [][]string
+	orig := execCommandContextFunc
+	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedArgs = append(capturedArgs, append([]string{name}, args...))
+		return exec.CommandContext(ctx, "sh", "-c", "true")
+	}
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:     "bd-x7f3",
+		Status: "failed",
+	}
+
+	if err := store.UpdateTask(context.Background(), task); err != nil {
+		t.Fatalf("UpdateTask failed status failed: %v", err)
+	}
+
+	// Expect exactly 2 bd calls: close + label add
+	if len(capturedArgs) != 2 {
+		t.Fatalf("expected 2 exec calls for failed status, got %d: %v", len(capturedArgs), capturedArgs)
+	}
+
+	// First call: bd close <id> --reason ...
+	first := joinArgs(capturedArgs[0])
+	if !contains(first, "close") {
+		t.Errorf("expected 'close' in first call: %v", capturedArgs[0])
+	}
+	if !contains(first, "--reason") {
+		t.Errorf("expected '--reason' in first call: %v", capturedArgs[0])
+	}
+
+	// Second call: bd label add <id> failed
+	second := joinArgs(capturedArgs[1])
+	if !contains(second, "label") {
+		t.Errorf("expected 'label' in second call: %v", capturedArgs[1])
+	}
+	if !contains(second, "add") {
+		t.Errorf("expected 'add' in second call: %v", capturedArgs[1])
+	}
+	if !contains(second, "failed") {
+		t.Errorf("expected 'failed' in second call: %v", capturedArgs[1])
+	}
+
+	// Verify sidecar was written
+	sidecar, err := store.readSidecar("bd-x7f3")
+	if err != nil {
+		t.Fatalf("readSidecar failed: %v", err)
+	}
+	if sidecar == nil {
+		t.Fatal("expected sidecar to be written after UpdateTask")
+	}
+}
+
+func TestUpdateTask_UnsupportedStatus_ReturnsError(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "sh", "-c", "true")
+	}
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:     "bd-x7f3",
+		Status: "pending",
+	}
+
+	err := store.UpdateTask(context.Background(), task)
+	if err == nil {
+		t.Fatal("UpdateTask should fail for unsupported status")
+	}
+	if !contains(err.Error(), "unsupported status") {
+		t.Errorf("expected 'unsupported status' in error, got: %v", err)
+	}
+}
+
+func TestUpdateTask_InProgress_PreservesSidecarFields(t *testing.T) {
+	store := newSidecarTestStore(t)
+
+	// Pre-write a sidecar with metadata
+	if err := store.writeSidecar("bd-x7f3", &TaskSidecar{
+		DevloopID:  "DEV-10",
+		Complexity: "complex",
+		MaxAttempts: 5,
+	}); err != nil {
+		t.Fatalf("writeSidecar failed: %v", err)
+	}
+
+	orig := execCommandContextFunc
+	execCommandContextFunc = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "sh", "-c", "true")
+	}
+	defer func() { execCommandContextFunc = orig }()
+
+	task := &Task{
+		ID:     "bd-x7f3",
+		Status: "in_progress",
+		Execution: TaskExecution{TotalDuration: 60},
+	}
+
+	if err := store.UpdateTask(context.Background(), task); err != nil {
+		t.Fatalf("UpdateTask failed: %v", err)
+	}
+
+	sidecar, err := store.readSidecar("bd-x7f3")
+	if err != nil {
+		t.Fatalf("readSidecar failed: %v", err)
+	}
+	// Existing fields should be preserved
+	if sidecar.DevloopID != "DEV-10" {
+		t.Errorf("DevloopID: expected DEV-10, got %q", sidecar.DevloopID)
+	}
+	if sidecar.Complexity != "complex" {
+		t.Errorf("Complexity: expected complex, got %q", sidecar.Complexity)
+	}
+	if sidecar.MaxAttempts != 5 {
+		t.Errorf("MaxAttempts: expected 5, got %d", sidecar.MaxAttempts)
+	}
+	// Execution should be updated
+	if sidecar.Execution.TotalDuration != 60 {
+		t.Errorf("TotalDuration: expected 60, got %d", sidecar.Execution.TotalDuration)
+	}
+}
+
 // joinArgs concatenates args with spaces for simple substring checking
 func joinArgs(args []string) string {
 	result := ""

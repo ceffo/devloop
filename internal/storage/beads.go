@@ -292,6 +292,76 @@ func (s *BeadsStore) QueryTasks(ctx context.Context, filter Filter) ([]*Task, er
 	return s.parseBdListOutput(out)
 }
 
+// UpdateTask dispatches the status transition to the appropriate bd command(s)
+// and updates the sidecar file with the latest execution and results data.
+//   - in_progress: bd update <id> --claim --json (atomic claim)
+//   - completed:   bd close <id> --reason 'Verification passed'
+//   - failed:      bd close <id> --reason 'Verification failed' + bd label add <id> failed
+//
+// All bd calls use a 10-second timeout.
+func (s *BeadsStore) UpdateTask(ctx context.Context, task *Task) error {
+	beadsID, err := s.resolveBeadsID(ctx, task.ID)
+	if err != nil {
+		return fmt.Errorf("UpdateTask: failed to resolve ID %q: %w", task.ID, err)
+	}
+
+	switch task.Status {
+	case "in_progress":
+		claimCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := execCommandContextFunc(claimCtx, s.bdPath, "update", beadsID, "--claim", "--json")
+		out, cmdErr := cmd.CombinedOutput()
+		cancel()
+		if cmdErr != nil {
+			return fmt.Errorf("bd update --claim %q failed: %w (output: %s)", beadsID, cmdErr, strings.TrimSpace(string(out)))
+		}
+
+	case "completed":
+		closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := execCommandContextFunc(closeCtx, s.bdPath, "close", beadsID, "--reason", "Verification passed")
+		out, cmdErr := cmd.CombinedOutput()
+		cancel()
+		if cmdErr != nil {
+			return fmt.Errorf("bd close %q failed: %w (output: %s)", beadsID, cmdErr, strings.TrimSpace(string(out)))
+		}
+
+	case "failed":
+		closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := execCommandContextFunc(closeCtx, s.bdPath, "close", beadsID, "--reason", "Verification failed")
+		out, cmdErr := cmd.CombinedOutput()
+		cancel()
+		if cmdErr != nil {
+			return fmt.Errorf("bd close %q failed: %w (output: %s)", beadsID, cmdErr, strings.TrimSpace(string(out)))
+		}
+
+		labelCtx, cancelLabel := context.WithTimeout(ctx, 10*time.Second)
+		cmd = execCommandContextFunc(labelCtx, s.bdPath, "label", "add", beadsID, "failed")
+		out, cmdErr = cmd.CombinedOutput()
+		cancelLabel()
+		if cmdErr != nil {
+			return fmt.Errorf("bd label add failed %q failed: %w (output: %s)", beadsID, cmdErr, strings.TrimSpace(string(out)))
+		}
+
+	default:
+		return fmt.Errorf("UpdateTask: unsupported status %q for task %q", task.Status, task.ID)
+	}
+
+	// Update sidecar with latest execution and results data
+	sidecar, err := s.readSidecar(beadsID)
+	if err != nil {
+		return fmt.Errorf("UpdateTask: failed to read sidecar for %q: %w", beadsID, err)
+	}
+	if sidecar == nil {
+		sidecar = &TaskSidecar{}
+	}
+	sidecar.Execution = task.Execution
+	sidecar.Results = task.Results
+	if err := s.writeSidecar(beadsID, sidecar); err != nil {
+		return fmt.Errorf("UpdateTask: failed to write sidecar for %q: %w", beadsID, err)
+	}
+
+	return nil
+}
+
 // SaveTask implements the six-step creation flow:
 //  1. Write task.Description to a temp file
 //  2. Call `bd create <title> --body-file <tempfile> --json`
