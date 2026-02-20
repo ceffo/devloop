@@ -19,6 +19,7 @@ type Config struct {
 	Execution    ExecutionConfig    `json:"execution"`
 	Archival     ArchivalConfig     `json:"archival,omitempty"`
 	Prompts      PromptsConfig      `json:"prompts,omitempty"`
+	Storage      StorageConfig      `json:"storage,omitempty"`
 }
 
 // ProjectConfig holds project-specific metadata
@@ -80,6 +81,11 @@ type ArchivalConfig struct {
 // PromptsConfig allows custom prompt templates
 type PromptsConfig struct {
 	CustomInstructions string `json:"custom_instructions,omitempty"`
+}
+
+// StorageConfig defines storage backend configuration
+type StorageConfig struct {
+	Backend string `json:"backend"`
 }
 
 // GetAgent returns the AgentConfig for the given agent name
@@ -215,6 +221,9 @@ func getDefaultConfig() *Config {
 		Prompts: PromptsConfig{
 			CustomInstructions: "",
 		},
+		Storage: StorageConfig{
+			Backend: "jsonl",
+		},
 	}
 }
 
@@ -255,6 +264,11 @@ func applyDefaults(cfg *Config) {
 
 	if cfg.Execution.CommitFormat == "" {
 		cfg.Execution.CommitFormat = defaults.Execution.CommitFormat
+	}
+
+	// Set storage backend default to 'jsonl' if empty
+	if cfg.Storage.Backend == "" {
+		cfg.Storage.Backend = "jsonl"
 	}
 }
 
