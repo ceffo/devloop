@@ -56,6 +56,9 @@ var resumeCmd = commands.ResumeCmd()
 // knowledgeCmd represents the knowledge command
 var knowledgeCmd = commands.KnowledgeCmd()
 
+// migrateCmd represents the migrate command
+var migrateCmd = commands.MigrateCmd()
+
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", ".devloop/config.json", "path to configuration file")
@@ -73,6 +76,7 @@ func init() {
 	rootCmd.AddCommand(archiveCmd)
 	rootCmd.AddCommand(sessionCmd)
 	rootCmd.AddCommand(knowledgeCmd)
+	rootCmd.AddCommand(migrateCmd)
 }
 
 func main() {

@@ -392,6 +392,91 @@ func (s *BeadsStore) Sync() error {
 	return nil
 }
 
+// SetMigrationStatus updates a Beads task's status after creation during migration.
+// It handles: in_progress (claim), completed (close), failed (close + label),
+// archived (close + compacted label), and blocked (no-op, deps handle blocking).
+// For pending status, this is a no-op since tasks are created as open by default.
+func (s *BeadsStore) SetMigrationStatus(ctx context.Context, beadsID string, devloopStatus string) error {
+	switch devloopStatus {
+	case "pending", "blocked":
+		// pending: created as "open" by default, no action needed
+		// blocked: deps already set via SaveTask; beads handles blocking via deps
+		return nil
+
+	case "in_progress":
+		claimCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := execCommandContextFunc(claimCtx, s.bdPath, "update", beadsID, "--claim", "--json")
+		out, err := cmd.CombinedOutput()
+		cancel()
+		if err != nil {
+			return fmt.Errorf("bd update --claim %q failed: %w (output: %s)", beadsID, err, strings.TrimSpace(string(out)))
+		}
+		return nil
+
+	case "completed":
+		closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := execCommandContextFunc(closeCtx, s.bdPath, "close", beadsID, "--reason", "migrated")
+		out, err := cmd.CombinedOutput()
+		cancel()
+		if err != nil {
+			return fmt.Errorf("bd close %q failed: %w (output: %s)", beadsID, err, strings.TrimSpace(string(out)))
+		}
+		return nil
+
+	case "failed":
+		closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := execCommandContextFunc(closeCtx, s.bdPath, "close", beadsID, "--reason", "migrated")
+		out, err := cmd.CombinedOutput()
+		cancel()
+		if err != nil {
+			return fmt.Errorf("bd close %q failed: %w (output: %s)", beadsID, err, strings.TrimSpace(string(out)))
+		}
+		labelCtx, cancelLabel := context.WithTimeout(ctx, 10*time.Second)
+		cmd = execCommandContextFunc(labelCtx, s.bdPath, "label", "add", beadsID, "failed")
+		out, err = cmd.CombinedOutput()
+		cancelLabel()
+		if err != nil {
+			return fmt.Errorf("bd label add failed %q failed: %w (output: %s)", beadsID, err, strings.TrimSpace(string(out)))
+		}
+		return nil
+
+	case "archived":
+		closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := execCommandContextFunc(closeCtx, s.bdPath, "close", beadsID, "--reason", "migrated")
+		out, err := cmd.CombinedOutput()
+		cancel()
+		if err != nil {
+			return fmt.Errorf("bd close %q failed: %w (output: %s)", beadsID, err, strings.TrimSpace(string(out)))
+		}
+		labelCtx, cancelLabel := context.WithTimeout(ctx, 10*time.Second)
+		cmd = execCommandContextFunc(labelCtx, s.bdPath, "label", "add", beadsID, "compacted")
+		out, err = cmd.CombinedOutput()
+		cancelLabel()
+		if err != nil {
+			return fmt.Errorf("bd label add compacted %q failed: %w (output: %s)", beadsID, err, strings.TrimSpace(string(out)))
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("SetMigrationStatus: unsupported status %q for task %q", devloopStatus, beadsID)
+	}
+}
+
+// LoadAllTasks returns all tasks from Beads regardless of status via `bd list --json`
+// (no status filter), merging each with its sidecar.
+func (s *BeadsStore) LoadAllTasks(ctx context.Context) ([]*Task, error) {
+	listCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	cmd := execCommandContextFunc(listCtx, s.bdPath, "list", "--json")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("bd list failed: %w", err)
+	}
+
+	return s.parseBdListOutput(out)
+}
+
 // SaveTask implements the six-step creation flow:
 //  1. Write task.Description to a temp file
 //  2. Call `bd create <title> --body-file <tempfile> --json`

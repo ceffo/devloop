@@ -49,6 +49,11 @@ func (s *JSONLStore) ConfigPath() string {
 	return filepath.Join(s.tasksDir, "config.json")
 }
 
+// TasksFilePath returns the full path to the tasks.jsonl file
+func (s *JSONLStore) TasksFilePath() string {
+	return s.getTasksFilePath()
+}
+
 // LoadTasks reads all tasks from the JSONL file
 func (s *JSONLStore) LoadTasks() ([]*Task, error) {
 	path := s.getTasksFilePath()
